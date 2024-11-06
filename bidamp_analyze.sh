@@ -5,7 +5,7 @@ ml R
 
 # first argument $1 should be rest of file directory to source location of fastq files NO FINAL SLASH
 # second argument $2 should be rest of file directory to final location of fq files NO FINAL SLASH
-# third argument $3 is the file.xlsx containing barcodes and filenames
+# third argument $3 is the file.csv containing barcodes and filenames
 # fourth argument $4 is the directory to the file you are aligning your sequences to
 # fifth argument $5 is directory to the file with the combos ModDetect will be run on
 # sixth argument $6 is the bed file ModDetect will use to find sites in
@@ -17,10 +17,8 @@ DEST_DIR="/oak/stanford/groups/nicolemm/rodell/BIDamplicon/minimap2/$2"
 
 # concatenate files, rename to the actual file name, move to be within the minimap2 destination directory
 
-# Using xlsx2csv to convert excel file to csv
-xlsx2csv $3 barcodes.csv
 # Set the input CSV file
-barcode_file="barcodes.csv"
+barcode_file="$3"
 
 # Read the CSV file line by line
 while IFS=, read -r barcode filename
@@ -135,10 +133,8 @@ echo "Read counts saved to $output_counts_file."
 BASE_PATH="$DEST_DIR/sorted/"
 FINAL_OUTPUT_FILE="${BASE_PATH}/all_results.csv"
 
-# Using xlsx2csv to convert excel file to csv
-xlsx2csv $5 file_combinations.csv
 # Name of the CSV file
-combos_file="file_combinations.csv"
+combos_file="$5"
 
 # Check if the input file exists
 if [ ! -f "$combos_file" ]; then
