@@ -43,7 +43,7 @@ do
         echo "Files for $barcode $filename unzipped"
 
         # Determine the output filename for this barcode
-        output_fastq= "$filename.fq"
+        output_fastq="$filename.fq"
 
         # Concatenate all .fastq files to the specified output filename
         cat *.fq >> "$output_fastq"
