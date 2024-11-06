@@ -71,7 +71,7 @@ done < "$barcode_file"
 
 echo "All barcodes have been concatenated and moved"
 
-cd $DEST_DIR
+(cd $DEST_DIR
 
 # align sequences
 
@@ -93,10 +93,10 @@ do
         
         echo "$filename mapping complete."
     }
-done < "$barcode_file"
+done < "$barcode_file")
 
 # count reads in alignment and mapping rate
-cd $DEST_DIR/sorted/
+(cd $DEST_DIR/sorted/
 
 # Output file for the count results
 output_counts_file="read_counts.txt"
@@ -125,9 +125,10 @@ for bam_file in *.bam; do
     fi
 done
 
-echo "Read counts saved to $output_counts_file."
+echo "Read counts saved to $output_counts_file.")
 
 # run ModDetect on files
+(cd  /oak/stanford/groups/nicolemm/rodell/BIDamplicon/ModDetect/
 
 # Base path to the sequencing data
 BASE_PATH="$DEST_DIR/sorted/"
@@ -178,7 +179,7 @@ do
         echo "Warning: Expected output file $result_file not found!"
     fi
 
-done < "$combos_file"
+done < "$combos_file")
 
 echo "All files processed with ModDetect. Final summary file located at ${BASE_PATH}/all_results.csv" 
 
