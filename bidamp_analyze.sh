@@ -46,7 +46,7 @@ do
         output_fastq="$filename.fq"
 
         # Concatenate all .fastq files to the specified output filename
-        cat *.fq >> "$output_fastq"
+        cat *.fastq >> "$output_fastq"
 
         # Move the concatenated file to the destination directory
         cp "$BASE_DIR/$barcode/$output_fastq" "$DEST_DIR/"
