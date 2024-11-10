@@ -21,6 +21,7 @@ do
     # Skip empty lines
     [ -z "$barcode" ] || [ -z "$filename" ] || {
         # Align to reference sequence using minimap2
+        echo "Current directory, start of loop: $PWD"
         echo "Aligning $filename..."
         /oak/stanford/groups/nicolemm/rodell/minimap2/minimap2 -a "$3" "$filename".fq -k5 > "$filename".sam
         
@@ -33,7 +34,7 @@ do
         samtools index "${filename}_sort.bam")
         
         echo "$filename mapping complete."
-        echo "Current directory: $PWD"
+        echo "Current directory, end of loop: $PWD"
     }
 done < "$barcode_file")
 
