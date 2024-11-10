@@ -1,5 +1,8 @@
 #!/usr/bin/bash
-#SBATCH --time=24:00:00
+#SBATCH --job-name=genomemapping%j
+#SBATCH --output=genomemapping%j.out
+#SBATCH --error=genomemapping%j.err
+#SBATCH --time=8:00:00
 #SBATCH -p normal
 #SBATCH -c 32
 #SBATCH --mem=32GB
