@@ -13,7 +13,7 @@ ml R
 # Define the base directory containing your fastq files from the Nanopore
 BASE_DIR="/oak/stanford/groups/nicolemm/rodell/BIDamplicon/$1"
 # Define the destination directory for the concatenated files
-DEST_DIR="/oak/stanford/groups/nicolemm/rodell/BIDamplicon/minimap2/$2"
+DEST_DIR="/oak/stanford/groups/nicolemm/rodell/BIDamplicon/$2"
 
 # concatenate files, rename to the actual file name, move to be within the minimap2 destination directory
 
@@ -82,7 +82,7 @@ do
     [ -z "$barcode" ] || [ -z "$filename" ] || {
         # Align to reference sequence using minimap2
         echo "Aligning $filename..."
-        minimap2 -a $4.fas "$filename".fq -k5 > "$filename".sam
+        /oak/stanford/groups/nicolemm/rodell/minimap2/minimap2 -a $4.fas "$filename".fq -k5 > "$filename".sam
         
         # Convert to BAM file, sort file, index file
         echo "Converting and sorting for $filename..."
