@@ -82,7 +82,7 @@ do
     [ -z "$barcode" ] || [ -z "$filename" ] || {
         # Align to reference sequence using minimap2
         echo "Aligning $filename..."
-        /oak/stanford/groups/nicolemm/rodell/minimap2/minimap2 -a $4.fas "$filename".fq -k5 > "$filename".sam
+        /oak/stanford/groups/nicolemm/rodell/minimap2/minimap2 -a "$4" "$filename".fq -k5 > "$filename".sam
         
         # Convert to BAM file, sort file, index file
         echo "Converting and sorting for $filename..."
