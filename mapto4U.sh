@@ -14,7 +14,7 @@ DEST_DIR="/oak/stanford/groups/nicolemm/rodell/BIDamplicon/$1"
 barcode_file="$2"
 
 # align sequences
-
+(cd $DEST_DIR
 # Read the CSV file line by line
 while IFS=, read -r barcode filename
 do
@@ -35,7 +35,7 @@ do
         echo "$filename mapping complete."
         echo "Current directory: $PWD"
     }
-done < "$barcode_file"
+done < "$barcode_file")
 
 # count reads in alignment and mapping rate
 (cd $DEST_DIR/sorted/
