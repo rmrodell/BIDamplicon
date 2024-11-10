@@ -88,8 +88,8 @@ do
         echo "Converting and sorting for $filename..."
         samtools view -b -o "$filename".bam "$filename".sam
         samtools sort -O bam -o "sorted/${filename}_sort.bam" "$filename".bam
-        cd "sorted"
-        samtools index "${filename}_sort.bam"
+        (cd "sorted"
+        samtools index "${filename}_sort.bam")
         
         echo "$filename mapping complete."
     }
