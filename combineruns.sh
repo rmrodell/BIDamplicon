@@ -1,12 +1,12 @@
 #!/bin/bash
 
 # Define the source directories
-dir1="BR_pool1/20241112"
-dir2="BR_pool1/20241113"
+dir1="BR_pool1/20241112/fastq"
+dir2="BR_pool1/20241113/fastq"
 target_dir="BR_pool1/fastq"
 
 # Loop through each FASTQ file in the first directory
-for file in "$dir1"/*.fastq; do
+for file in "$dir1"/*.fq; do
     # Extract the base filename (without path)
     filename=$(basename "$file")
     
