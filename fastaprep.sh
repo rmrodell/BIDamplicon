@@ -11,11 +11,11 @@ DEST_DIR="/scratch/users/rodell/$2"
 
 # concatenate files, rename to the actual file name, move to be within the minimap2 destination directory
 
-# Set the input CSV file
+# Set the input txt file
 barcode_file="$3"
 
-# Read the CSV file line by line
-while IFS=, read -r barcode filename
+# Read the txt file line by line
+while IFS=$'\t' read -r barcode filename
 do
     # Skip empty lines
     [ -z "$barcode" ] || [ -z "$filename" ] || {
