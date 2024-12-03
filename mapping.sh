@@ -4,6 +4,7 @@
 # second argument $2 is location of template aligning to
 # third arugment $3 is output location for mapped files NO FINAL SLASH
 
+(cd $1
 # Loop through each .fq file in the input directory
 for fq_file in "$1"/*.fq; do
     filename=$(basename "${fq_file}" .fq)  # Get the base name without the extension
@@ -18,11 +19,10 @@ for fq_file in "$1"/*.fq; do
         echo "Converting and sorting for $filename..."
         samtools view -b -o "$3/${filename}.bam" "$3/${filename}.sam"
         samtools sort -O bam -o "$3/sorted/${filename}_sort.bam" "$3/${filename}.bam"
-        (cd "$3/sorted/" && echo "Current directory for indexing: $PWD" && samtools index "${filename}_sort.bam")
+        (cd "$3/sorted/" && samtools index "${filename}_sort.bam")
 
         echo "$filename mapping complete."
-        echo "Current directory, end of loop: $PWD"
     ) &
-done
+done )
 
 wait # Wait for all background jobs to finish
