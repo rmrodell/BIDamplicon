@@ -1,5 +1,7 @@
 #!/bin/bash
 
+ml biology samtools
+
 # first argument $1 is location of fastq files NO FINAL SLASH
 # second argument $2 is location of template aligning to
 # third arugment $3 is output location for mapped files NO FINAL SLASH
@@ -13,7 +15,7 @@ for fq_file in "$1"/*.fq; do
         echo "Processing $filename..."
         
         # Map using minimap2
-        /oak/stanford/groups/nicolemm/rodell/minimap2/minimap2 -a $2 "${fq_file}" -k5 > "$3/${filename}.sam"
+        /oak/stanford/groups/nicolemm/rodell/minimap2/minimap2 -a $2 "${fq_file}" -k5 > $3/"${filename}.sam"
 
         # Convert to BAM file, sort the file, and index it
         echo "Converting and sorting for $filename..."
