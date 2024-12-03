@@ -2,16 +2,15 @@
 
 ml biology samtools
 
-# Directory containing the SAM files
-SAM_DIR="/oak/stanford/groups/nicolemm/rodell/BIDamplicon/minimap2/20241003"
+# first argument $1 is directory with sorted sam files NO FINAL SLASH
 # Output file for the count results
 output_file="read_counts.txt"
 
 # Create or clear the output file
-echo "SAM File Name, Read Count" > "$output_file"
+echo "SAM File Name, Read Count" > "$1/$output_file"
 
 # Iterate over all .sam files in the specified directory
-for sam_file in "$SAM_DIR"/*.sam; do
+for sam_file in "$1"/*.sam; do
     # Check if the file exists
     if [[ -f "$sam_file" ]]; then
         # Count the number of reads using samtools
@@ -21,10 +20,10 @@ for sam_file in "$SAM_DIR"/*.sam; do
         base_name=$(basename "$sam_file")
 
         # Append the result to the output file
-        echo "$base_name, $read_count" >> "$output_file"
+        echo "$base_name, $read_count" >> "$1/$output_file"
     else
-        echo "No .sam files found in $SAM_DIR."
+        echo "No .sam files found in $1."
     fi
 done
 
-echo "Read counts saved to $output_file."
+echo "Read counts saved to $1/$output_file."
