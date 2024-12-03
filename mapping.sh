@@ -24,7 +24,7 @@ for fq_file in "$1"/*.fq; do
         (cd "$3/sorted/" && samtools index "${filename}_sort.bam")
 
         echo "$filename mapping complete."
-    ) &
+    )
 done )
 
 wait # Wait for all background jobs to finish
