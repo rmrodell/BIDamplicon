@@ -44,7 +44,7 @@ do
         -r "$3" \
         -m 1 \
         -o "${BASE_PATH}/${sample}.csv" \
-        -b "${BASE_PATH}/$4" \
+        -b $4 \
         -x $5 \
         -y $6 \
         -d
