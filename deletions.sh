@@ -22,6 +22,7 @@ if [ ! -f "$combos_file" ]; then
     exit 1
 fi
 
+(cd /scratch/users/rodell/ModDetect
 # run ModDetect on files
 # Initialize the final output file
 echo "sample,chr,pos,NReads_test,gene,metadata,A.count,C.count,G.count,T.count,Deletion.count,Insertion.count,A.count.ctrl,C.count.ctrl,G.count.ctrl,T.count.ctrl,Deletion.count.ctrl,Insertion.count.ctrl,reference,kmer,strand,NReads_ctrl,mm.perc,ctrl.err,expected.err,p" > "$FINAL_OUTPUT_FILE"
@@ -37,7 +38,7 @@ do
     echo "Processing files: treated $f_file, control $g_file, sample $sample"
 
     # Rscript command with values from the CSV
-    Rscript /oak/stanford/groups/nicolemm/rodell/BIDamplicon/ModDetect/ModDetect.R \
+    Rscript ModDetect.R \
         -f "${BASE_PATH}/${f_file}" \
         -g "${BASE_PATH}/${g_file}" \
         -r "$3" \
@@ -59,6 +60,6 @@ do
         echo "Warning: Expected output file $result_file not found!"
     fi
 
-done < "$combos_file"
+done < "$combos_file")
 
 echo "All files processed with ModDetect. Final summary file located at ${BASE_PATH}/all_results.csv" 
