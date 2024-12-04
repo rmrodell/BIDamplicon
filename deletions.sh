@@ -27,6 +27,9 @@ fi
 # Initialize the final output file
 echo "sample,chr,pos,NReads_test,gene,metadata,A.count,C.count,G.count,T.count,Deletion.count,Insertion.count,A.count.ctrl,C.count.ctrl,G.count.ctrl,T.count.ctrl,Deletion.count.ctrl,Insertion.count.ctrl,reference,kmer,strand,NReads_ctrl,mm.perc,ctrl.err,expected.err,p" > "$FINAL_OUTPUT_FILE"
 
+# Variable to track if the header has been written in final output file
+header_written=false
+
 # Read the CSV file line by line
 while IFS=$'\t' read -r f_file g_file sample
 do
@@ -53,9 +56,17 @@ do
     result_file="${BASE_PATH}/${sample}.csv"
 
     if [ -f "$result_file" ]; then
-        # Skip the header in subsequent files and prepend the sample name
-        # Use awk to add the sample name to each line after the header
-        awk -v sample="$sample" 'NR==1 {print $0} NR>1 {print sample "," $0}' "$result_file" >> "$FINAL_OUTPUT_FILE"
+
+    # If the header hasn't been written yet, we write the header line
+        if [ "$header_written" = false ]; then
+            # Print the header of the first file and set the flag
+            awk -v sample="$sample" 'NR==1 {print $0}' "$result_file" >> "$FINAL_OUTPUT_FILE"
+            header_written=true
+        fi
+        
+        # Append the rest of the lines (skip header for subsequent files)
+        awk -v sample="$sample" 'NR > 1 {print sample "," $0}' "$result_file" >> "$FINAL_OUTPUT_FILE"
+
     else
         echo "Warning: Expected output file $result_file not found!"
     fi
