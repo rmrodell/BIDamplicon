@@ -23,7 +23,7 @@ echo "Processing $sample..."
 umi_tools extract -I $file_path -p NNNNNNNNNN --log=$sample.log -S $fq_directory/{$sample}_umi.fq 
 
 # Map using minimap2
-/oak/stanford/groups/nicolemm/rodell/minimap2/minimap2 -a $ref_fa $file_path -k5 > $dest_dir/$sample.sam
+/oak/stanford/groups/nicolemm/rodell/minimap2/minimap2 -a $ref_fa $fq_directory/{$sample}_umi.fq -k5 > $dest_dir/$sample.sam
 
 # Convert to BAM file, sort the file, and index it
 echo "Converting and sorting for $sample..."
