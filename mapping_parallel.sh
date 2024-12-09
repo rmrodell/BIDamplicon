@@ -20,7 +20,7 @@ dest_dir=$3
 echo "Processing $sample..."
         
 # Map using minimap2
-/oak/stanford/groups/nicolemm/rodell/minimap2/minimap2 -a $ref_fa $file_path -k5 > $dest_dir/$sample.sam
+/oak/stanford/groups/nicolemm/rodell/minimap2/minimap2 -a $ref_fa $file_path -k5 -t 31 > $dest_dir/$sample.sam
 
 # Convert to BAM file, sort the file, and index it
 echo "Converting and sorting for $sample..."
