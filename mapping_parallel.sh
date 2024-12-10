@@ -25,7 +25,7 @@ echo "Processing $sample..."
 # Convert to BAM file, sort the file, and index it
 echo "Converting and sorting for $sample..."
 samtools view -b -o "$dest_dir/$sample.bam" "$dest_dir/$sample.sam"
-samtools sort -O bam -o "$dest_dir/sorted/{$sample}_sort.bam" "$dest_dir/${sample}.bam"
+samtools sort -O bam -o "$dest_dir/sorted/${sample}_sort.bam" "$dest_dir/${sample}.bam"
 (cd "$dest_dir/sorted/" && samtools index "${sample}_sort.bam")
 )
 

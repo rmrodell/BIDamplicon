@@ -20,16 +20,16 @@ dest_dir=$3
 echo "Processing $sample..."
         
 # Extract UMIs to read name
-umi_tools extract -I $file_path -p NNNNNNNNNN --log=$sample.log -S $fq_directory/{$sample}_umi.fq 
+umi_tools extract -I $file_path -p NNNNNNNNNN --log=$sample.log -S "$fq_directory/${sample}_umi.fq" 
 
 # Map using minimap2
 # threads -t should be n-1 number of cores/cpus requested from sherlock
-/oak/stanford/groups/nicolemm/rodell/minimap2/minimap2 -a $ref_fa $fq_directory/{$sample}_umi.fq -k5 -t 31> $dest_dir/$sample.sam
+/oak/stanford/groups/nicolemm/rodell/minimap2/minimap2 -a $ref_fa "$fq_directory/${sample}_umi.fq" -k5 -t 31 > "$dest_dir/$sample.sam"
 
 # Convert to BAM file, sort the file, and index it
 echo "Converting and sorting for $sample..."
 samtools view -b -o "$dest_dir/$sample.bam" "$dest_dir/$sample.sam"
-samtools sort -O bam -o "$dest_dir/sorted/{$sample}_sort.bam" "$dest_dir/${sample}.bam")
+samtools sort -O bam -o "$dest_dir/sorted/${sample}_sort.bam" "$dest_dir/${sample}.bam")
 (cd "$dest_dir/sorted/" && samtools index "${sample}_sort.bam")
 
 if ls $dest_dir/sorted/"${sample}_sort.bam"; then
