@@ -15,7 +15,7 @@ for fq_file in "$1"/*.fq; do
         echo "Processing $filename..."
         
         # Map using minimap2
-        /oak/stanford/groups/nicolemm/rodell/minimap2/minimap2 -a $2 "${fq_file}" -k5 > $3/"${filename}.sam"
+        /oak/stanford/groups/nicolemm/rodell/minimap2/minimap2 -a $2 "${fq_file}" -k5 -t 9 > $3/"${filename}.sam"
 
         # Convert to BAM file, sort the file, and index it
         echo "Converting and sorting for $filename..."
@@ -23,7 +23,11 @@ for fq_file in "$1"/*.fq; do
         samtools sort -O bam -o "$3/sorted/${filename}_sort.bam" "$3/${filename}.bam"
         (cd "$3/sorted/" && samtools index "${filename}_sort.bam")
 
-        echo "$filename mapping complete."
+	if ls $dest_dir/sorted/"${sample}_sort.bam"; then
+    		echo "$filename mapping complete."
+
+	else
+		echo "$filename mapping failed. No sorted bam file exists."
     )
 done )
 
