@@ -28,6 +28,7 @@ for fq_file in "$1"/*.fq; do
 
 	else
 		echo "$filename mapping failed. No sorted bam file exists."
+    fi
     )
 done )
 
