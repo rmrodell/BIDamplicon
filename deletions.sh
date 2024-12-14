@@ -11,10 +11,17 @@
 
 # Base path to the sequencing data
 BASE_PATH="$1"
-FINAL_OUTPUT_FILE="${BASE_PATH}/all_results.csv"
 
 # Name of the CSV file
 combos_file="$2"
+
+# Name other arguments
+ref_fa="$3"
+bed="$4"
+read_depth="$5"
+mismatch="$6"
+
+FINAL_OUTPUT_FILE="${BASE_PATH}/all_results_${read_depth}reads_${mismatch}.csv"
 
 # Check if the input file exists
 if [ ! -f "$combos_file" ]; then
@@ -44,16 +51,16 @@ do
     Rscript ModDetect.R \
         -f "${BASE_PATH}/${f_file}" \
         -g "${BASE_PATH}/${g_file}" \
-        -r "$3" \
+        -r "$ref_fa" \
         -m 1 \
-        -o "${BASE_PATH}/${sample}.csv" \
-        -b $4 \
-        -x $5 \
-        -y $6 \
+        -o "${BASE_PATH}/${sample}_${read_depth}reads_${mismatch}.csv" \
+        -b "$bed" \
+        -x "$read_depth" \
+        -y "$mismatch" \
         -d
 
     # Process the resultant file and append it to the final output
-    result_file="${BASE_PATH}/${sample}.csv"
+    result_file="${BASE_PATH}/${sample}_${read_depth}reads_${mismatch}.csv"
 
     if [ -f "$result_file" ]; then
 
@@ -73,4 +80,4 @@ do
 
 done < "$combos_file")
 
-echo "All files processed with ModDetect. Final summary file located at ${BASE_PATH}/all_results.csv" 
+echo "All files processed with ModDetect. Final summary file located at ${BASE_PATH}/all_results_${read_depth}reads_${mismatch}.csv" 
