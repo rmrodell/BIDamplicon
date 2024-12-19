@@ -4,11 +4,11 @@ ml biology samtools
 ml biology py-cutadapt/1.18_py36
 
 # first argument $1 is location of fastq files NO FINAL SLASH
-DIR_fastq = $1
-# second argument $2 is location of template aligning to
-ref_fa = $2
+DIR_fastq=$1
+# second argument $2 is location of template aligning to NO .FASTA INCLUDED
+ref_fa=$2
 # third arugment $3 is output location for mapped files NO FINAL SLASH
-DIR_dest = $3
+DIR_dest=$3
 
 (cd $1
 # Loop through each .fq file in the input directory
