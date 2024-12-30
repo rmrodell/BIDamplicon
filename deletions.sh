@@ -20,6 +20,7 @@ ref_fa="$3"
 bed="$4"
 read_depth="$5"
 mismatch="$6"
+pvalue="$7"
 
 FINAL_OUTPUT_FILE="${BASE_PATH}/all_results_${read_depth}reads_${mismatch}.csv"
 
@@ -52,7 +53,7 @@ do
         -f "${BASE_PATH}/${f_file}" \
         -g "${BASE_PATH}/${g_file}" \
         -r "$ref_fa" \
-        -m 1 \
+        -m "$pvalue" \
         -o "${BASE_PATH}/${sample}_${read_depth}reads_${mismatch}.csv" \
         -b "$bed" \
         -x "$read_depth" \
