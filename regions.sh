@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/bash
 
 # this version does NOT pay attention to strandedness
 BED=$1 # first argument is bed file with sites of interest
