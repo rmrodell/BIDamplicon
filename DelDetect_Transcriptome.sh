@@ -27,7 +27,7 @@ echo "Processing sample: ${sample}"
 echo "Final counts will be available at: ${count_file}"
 
 # extract counts using bam_counts.R
-Rscript bam_count.R --bedFile $bed --bamFile $bam_file --referenceFasta $ref_fa --outputFile $countfile
+Rscript /scratch/users/rodell/DelDetect/bam_counts.R --bedFile $bed --bamFile $bam_file --referenceFasta $ref_fa --outputFile $countfile
 
 echo "Counting complete. Final count file located at $count_file" 
 
