@@ -1,4 +1,6 @@
 #!/bin/bash
+  
+ml R
 
 # Get the directory where DelDetect.sh is located
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
