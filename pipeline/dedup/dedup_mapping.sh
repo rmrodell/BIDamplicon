@@ -2,8 +2,6 @@
 set -e
 set -u
 
-# this trims two sets of adapters, so is optimized to work on pool 1 set up
-
 ml biology
 ml py-cutadapt/1.18_py36
 ml samtools
@@ -41,7 +39,7 @@ SAMPLE_NAME=$(basename ${INPUT_FILE} .fq)
 echo "Extracted sample name: ${SAMPLE_NAME}"
 
 # Create directory structure
-mkdir -p ${BASE_DIR}/{logs,trimmed1,trimmed2,UMI_extracted,minimap2,minimap2/sorted,minimap2/dedup}
+mkdir -p ${BASE_DIR}/{logs,trimmed1,UMI_extracted,minimap2,minimap2/sorted,minimap2/dedup}
 
 echo "Processing ${SAMPLE_NAME}"
 echo "Input file: ${INPUT_FILE}"
@@ -54,7 +52,7 @@ echo "Base directory: ${BASE_DIR}"
 # Trim Adapters
 trim_log=${BASE_DIR}/logs/trimmed1.log
 
-echo "trimming first adapters"
+echo "trimming Nanopore adapters"
 cutadapt -m 125 -O 15 --cores ${THREADS} -a 'GAAGATAGAGCGACAGGCAAGT' -o ${BASE_DIR}/trimmed1/${SAMPLE_NAME}.fq ${INPUT_FILE} > $trim_log
 
 
@@ -68,18 +66,12 @@ echo "extracting UMIs"
 umi_tools extract -I $r1 --extract-method=string --bc-pattern=NNNNNNNNNN --3prime -L $extract_log > $r1_umi
 
 
-#Trim Pool1 Adapters
-trim_log=${BASE_DIR}/logs/trimmed2.log
-
-echo "trimming second adapters"
-cutadapt --discard-untrimmed -m 120 -O 10 --cores ${THREADS} -a 'CACTCGGGCACCAAGGAC' -g 'GGACGCTCTTCCGATCT' -o ${BASE_DIR}/trimmed2/${SAMPLE_NAME}_UMI.fq ${BASE_DIR}/UMI_extracted/${SAMPLE_NAME}_UMI.fq > $trim_log
-
 # Mapping
 minimap2_log=${BASE_DIR}/logs/UMI_minimap2.log
 
-echo "mapping 4psi with minimap2"
+echo "mapping with minimap2"
 # Map using minimap2
-/oak/stanford/groups/nicolemm/rodell/minimap2/minimap2 -a ${REFERENCE_FASTA} ${BASE_DIR}/trimmed2/${SAMPLE_NAME}_UMI.fq -k5 -t ${THREADS} > ${BASE_DIR}/minimap2/${SAMPLE_NAME}_UMI.sam 2>> ${minimap2_log}
+/oak/stanford/groups/nicolemm/rodell/minimap2/minimap2 -a ${REFERENCE_FASTA} ${BASE_DIR}/UMI_extracted/${SAMPLE_NAME}_UMI.fq -k5 -t ${THREADS} > ${BASE_DIR}/minimap2/${SAMPLE_NAME}_UMI.sam 2>> ${minimap2_log}
 
 
 # Convert to BAM file, sort the file, and index it
@@ -110,10 +102,6 @@ echo "Initial reads: ${INITIAL_READS}" >> ${SUMMARY_FILE}
 TRIMMED1_READS=$(echo $(cat ${BASE_DIR}/trimmed1/${SAMPLE_NAME}.fq | wc -l)/4 | bc)
 echo "After first trimming: ${TRIMMED1_READS}" >> ${SUMMARY_FILE}
 
-# Count trimmed2 reads
-TRIMMED2_READS=$(echo $(cat ${BASE_DIR}/trimmed2/${SAMPLE_NAME}_UMI.fq | wc -l)/4 | bc)
-echo "After second trimming: ${TRIMMED2_READS}" >> ${SUMMARY_FILE}
-
 # Count mapped reads (from BAM)
 MAPPED_READS=$(samtools view -c ${BASE_DIR}/minimap2/sorted/${SAMPLE_NAME}_UMI_sort.bam)
 echo "Mapped reads: ${MAPPED_READS}" >> ${SUMMARY_FILE}
@@ -126,12 +114,10 @@ echo "After deduplication: ${DEDUP_READS}" >> ${SUMMARY_FILE}
 
 echo "Percentages relative to initial reads:" >> ${SUMMARY_FILE}
 echo "First trimming: $(echo "scale=4; ${TRIMMED1_READS}/${INITIAL_READS}*100" | bc)%" >> ${SUMMARY_FILE}
-echo "Second trimming: $(echo "scale=4; ${TRIMMED2_READS}/${INITIAL_READS}*100" | bc)%" >> ${SUMMARY_FILE}
 echo "Mapped: $(echo "scale=4; ${MAPPED_READS}/${INITIAL_READS}*100" | bc)%" >> ${SUMMARY_FILE}
 echo "After deduplication: $(echo "scale=4; ${DEDUP_READS}/${INITIAL_READS}*100" | bc)%" >> ${SUMMARY_FILE}
 
 echo -e "\nPercentages relative to previous step:" >> ${SUMMARY_FILE}
 echo "First trimming: $(echo "scale=2; ${TRIMMED1_READS}/${INITIAL_READS}*100" | bc)%" >> ${SUMMARY_FILE}
-echo "Second trimming: $(echo "scale=2; ${TRIMMED2_READS}/${TRIMMED1_READS}*100" | bc)%" >> ${SUMMARY_FILE}
-echo "Mapped: $(echo "scale=2; ${MAPPED_READS}/${TRIMMED2_READS}*100" | bc)%" >> ${SUMMARY_FILE}
+echo "Mapped: $(echo "scale=2; ${MAPPED_READS}/${TRIMMED1_READS}*100" | bc)%" >> ${SUMMARY_FILE}
 echo "After deduplication: $(echo "scale=2; ${DEDUP_READS}/${MAPPED_READS}*100" | bc)%" >> ${SUMMARY_FILE}
