@@ -2,6 +2,11 @@
 set -e
 set -u
 
+# Get the directory where this script is located
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+# Get the root directory of the git repo (assuming the script is in the root)
+REPO_ROOT="$SCRIPT_DIR"
+
 # This trims two sets of adapters, so it optimized to work on pool 1 setup
 
 # Check if required arguments are provided
@@ -34,7 +39,7 @@ fi
 for fastq in ${INPUT_DIR}/*.fq; do
     if [ -f "$fastq" ]; then
         echo "Processing $fastq"
-        bash /oak/stanford/groups/nicolemm/rodell/BIDamplicon/BIDamplicon/pipeline/dedup/dedup_mapping.sh "$fastq" "$REFERENCE_FASTA" "$BASE_DIR" "$THREADS"
+        bash "${REPO_ROOT}/dedup_mapping.sh" "$fastq" "$REFERENCE_FASTA" "$BASE_DIR" "$THREADS"
     fi
 done
 
