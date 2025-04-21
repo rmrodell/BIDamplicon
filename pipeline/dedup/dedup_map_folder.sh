@@ -39,7 +39,7 @@ fi
 for fastq in ${INPUT_DIR}/*.fq; do
     if [ -f "$fastq" ]; then
         echo "Processing $fastq"
-        bash "${REPO_ROOT}/pipeline/dedup/dedup_mapping.sh" "$fastq" "$REFERENCE_FASTA" "$BASE_DIR" "$THREADS"
+        bash "${REPO_ROOT}/dedup_mapping.sh" "$fastq" "$REFERENCE_FASTA" "$BASE_DIR" "$THREADS"
     fi
 done
 
