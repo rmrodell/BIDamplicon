@@ -2,6 +2,8 @@
 set -e
 set -u
 
+# this trims two sets of adapters, so is optimized to work on pool 1 set up
+
 ml biology
 ml py-cutadapt/1.18_py36
 ml samtools
@@ -82,7 +84,7 @@ echo "mapping 4psi with minimap2"
 
 # Convert to BAM file, sort the file, and index it
 echo "Converting and sorting"
-samtools view -b -o ${BASE_DIR}/minimap2_4psi/${SAMPLE_NAME}_UMI.bam ${BASE_DIR}/minimap2/${SAMPLE_NAME}_UMI.sam
+samtools view -b -o ${BASE_DIR}/minimap2/${SAMPLE_NAME}_UMI.bam ${BASE_DIR}/minimap2/${SAMPLE_NAME}_UMI.sam
 samtools sort -@ ${THREADS} -O bam -o ${BASE_DIR}/minimap2/sorted/${SAMPLE_NAME}_UMI_sort.bam ${BASE_DIR}/minimap2/${SAMPLE_NAME}_UMI.bam
 (cd ${BASE_DIR}/minimap2/sorted/ && samtools index ${SAMPLE_NAME}_UMI_sort.bam)
 

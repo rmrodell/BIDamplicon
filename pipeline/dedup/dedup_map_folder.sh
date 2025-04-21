@@ -2,6 +2,8 @@
 set -e
 set -u
 
+# This trims two sets of adapters, so it optimized to work on pool 1 setup
+
 # Check if required arguments are provided
 if [ $# -lt 3 ]; then
     echo "Usage: $0 <input_directory> <reference_fasta> <base_directory> [threads]"
@@ -32,7 +34,7 @@ fi
 for fastq in ${INPUT_DIR}/*.fq; do
     if [ -f "$fastq" ]; then
         echo "Processing $fastq"
-        bash dedup_mapping.sh "$fastq" "$REFERENCE_FASTA" "$BASE_DIR" "$THREADS"
+        bash /oak/stanford/groups/nicolemm/rodell/BIDamplicon/BIDamplicon/pipeline/dedup/dedup_mapping.sh "$fastq" "$REFERENCE_FASTA" "$BASE_DIR" "$THREADS"
     fi
 done
 
