@@ -9,7 +9,8 @@ DIR_fastq=$1
 ref_fa=$2
 # third arugment $3 is output location for mapped files NO FINAL SLASH
 DIR_dest=$3
-
+# fourth argument $4 is the number of threads to use
+THREADS=${4:-1}  # Use 1 threads if not specified
 
 # Check and create required directories
 echo "Checking and creating required directories..."
@@ -51,11 +52,11 @@ for fq_file in "$1"/*.fq; do
         
         echo "removing adapter"
         # trim adapters with CutAdapt with all cores available
-        cutadapt -a CACTCGGGCACCAAGGAC -g GACGCTCTTCCGATCT -o $DIR_fastq/trimmed/"${sample}"_trimmed.fq "${fq_file}"
+        cutadapt -a CACTCGGGCACCAAGGAC -g GACGCTCTTCCGATCT --cores ${THREADS} -o $DIR_fastq/trimmed/"${sample}"_trimmed.fq "${fq_file}"
 
         echo "mapping with minimap2"
         # Map using minimap2
-        /oak/stanford/groups/nicolemm/rodell/minimap2/minimap2 -a $ref_fa $DIR_fastq/trimmed/"${sample}"_trimmed.fq -k5 -t 15 > $DIR_dest/minimap2/"${sample}.sam"
+        /oak/stanford/groups/nicolemm/rodell/minimap2/minimap2 -a $ref_fa $DIR_fastq/trimmed/"${sample}"_trimmed.fq -k5 -t ${THREADS} > $DIR_dest/minimap2/"${sample}.sam"
 
         # Convert to BAM file, sort the file, and index it
         echo "Converting and sorting for $sample mapped with minimap2"
