@@ -77,7 +77,7 @@ cutadapt --discard-untrimmed -m 120 -O 10 --cores ${THREADS} -a 'CACTCGGGCACCAAG
 # Mapping
 minimap2_log=${BASE_DIR}/logs/UMI_minimap2.log
 
-echo "mapping 4psi with minimap2"
+echo "mapping with minimap2"
 # Map using minimap2
 /oak/stanford/groups/nicolemm/rodell/minimap2/minimap2 -a ${REFERENCE_FASTA} ${BASE_DIR}/trimmed2/${SAMPLE_NAME}_UMI.fq -k5 -t ${THREADS} > ${BASE_DIR}/minimap2/${SAMPLE_NAME}_UMI.sam 2>> ${minimap2_log}
 
@@ -115,11 +115,11 @@ TRIMMED2_READS=$(echo $(cat ${BASE_DIR}/trimmed2/${SAMPLE_NAME}_UMI.fq | wc -l)/
 echo "After second trimming: ${TRIMMED2_READS}" >> ${SUMMARY_FILE}
 
 # Count mapped reads (from BAM)
-MAPPED_READS=$(samtools view -c ${BASE_DIR}/minimap2/sorted/${SAMPLE_NAME}_UMI_sort.bam)
+MAPPED_READS=$(samtools view -c -F 4 ${BASE_DIR}/minimap2/sorted/${SAMPLE_NAME}_UMI_sort.bam)
 echo "Mapped reads: ${MAPPED_READS}" >> ${SUMMARY_FILE}
 
 # Count deduplicated reads
-DEDUP_READS=$(samtools view -c ${BASE_DIR}/minimap2/dedup/${SAMPLE_NAME}_UMI_dedup.bam)
+DEDUP_READS=$(samtools view -c -F 4 ${BASE_DIR}/minimap2/dedup/${SAMPLE_NAME}_UMI_dedup.bam)
 echo "After deduplication: ${DEDUP_READS}" >> ${SUMMARY_FILE}
 
 # Calculate percentages

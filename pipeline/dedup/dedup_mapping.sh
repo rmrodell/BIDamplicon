@@ -103,11 +103,11 @@ TRIMMED1_READS=$(echo $(cat ${BASE_DIR}/trimmed1/${SAMPLE_NAME}.fq | wc -l)/4 | 
 echo "After first trimming: ${TRIMMED1_READS}" >> ${SUMMARY_FILE}
 
 # Count mapped reads (from BAM)
-MAPPED_READS=$(samtools view -c ${BASE_DIR}/minimap2/sorted/${SAMPLE_NAME}_UMI_sort.bam)
+MAPPED_READS=$(samtools view -c -F 4 ${BASE_DIR}/minimap2/sorted/${SAMPLE_NAME}_UMI_sort.bam)
 echo "Mapped reads: ${MAPPED_READS}" >> ${SUMMARY_FILE}
 
 # Count deduplicated reads
-DEDUP_READS=$(samtools view -c ${BASE_DIR}/minimap2/dedup/${SAMPLE_NAME}_UMI_dedup.bam)
+DEDUP_READS=$(samtools view -c -F 4 ${BASE_DIR}/minimap2/dedup/${SAMPLE_NAME}_UMI_dedup.bam)
 echo "After deduplication: ${DEDUP_READS}" >> ${SUMMARY_FILE}
 
 # Calculate percentages
