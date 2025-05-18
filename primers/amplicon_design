@@ -1,0 +1,270 @@
+library(GenomicRanges)      # For GRanges objects
+library(BSgenome.Hsapiens.UCSC.hg38)  # For human genome sequence
+library(biomaRt)           # For accessing Ensembl data
+library(openxlsx)          # For Excel output
+
+# Set up biomaRt connection
+ensembl <- useEnsembl(biomart = "genes", 
+                      dataset = "hsapiens_gene_ensembl")
+
+
+process_coordinates <- function(coordinates, output_file = "primer_design_results.xlsx") {
+  # Initialize empty dataframe to store all results
+  all_results <- data.frame()
+  
+  for(coordinate in coordinates) {
+    # Try-catch block to handle potential errors
+    tryCatch({
+      # Parse coordinate
+      chr <- strsplit(coordinate, ":")[[1]][1]
+      pos <- as.numeric(strsplit(coordinate, ":")[[1]][2])
+      
+      # Create initial result
+      result <- data.frame(
+        coordinate = coordinate,
+        chr = chr,
+        pos = pos
+      )
+      
+      # Determine strand with T
+      gr_plus <- GRanges(seqnames = chr, ranges = IRanges(pos, pos), strand = "+")
+      gr_minus <- GRanges(seqnames = chr, ranges = IRanges(pos, pos), strand = "-")
+      seq_plus <- getSeq(BSgenome.Hsapiens.UCSC.hg38, gr_plus)
+      seq_minus <- getSeq(BSgenome.Hsapiens.UCSC.hg38, gr_minus)
+      result$strand <- ifelse(as.character(seq_plus) == "T", "+",
+                              ifelse(as.character(seq_minus) == "T", "-", "no T"))
+      
+      # Process only if T is found
+      if(result$strand != "no T") {
+        # Create GRanges object
+        gr <- GRanges(seqnames = chr, ranges = IRanges(pos, pos), strand = result$strand)
+        chr_number <- gsub("chr", "", chr)
+        
+        # Query biomaRt
+        refseq_info <- getBM(
+          attributes = c("refseq_mrna", "ensembl_gene_id", "ensembl_transcript_id",
+                         "external_gene_name", "transcript_length", "transcript_biotype",
+                         "strand", "transcript_is_canonical"),
+          filters = c("chromosome_name", "start", "end"),
+          values = list(chromosome_name = chr_number,
+                        start = pos-1000, end = pos+1000),
+          mart = ensembl
+        )
+        
+        # Process canonical transcripts
+        strand_value <- ifelse(result$strand == "+", 1, -1)
+        canonical_transcripts <- refseq_info[
+          refseq_info$strand == strand_value & 
+            refseq_info$transcript_is_canonical == 1 &
+            !is.na(refseq_info$refseq_mrna), 
+        ]
+        canonical_transcripts <- canonical_transcripts[complete.cases(canonical_transcripts), ]
+        
+        if(nrow(canonical_transcripts) > 0) {
+          canonical_transcript <- canonical_transcripts[1,]
+          
+          # Get exon information
+          exon_info <- getBM(
+            attributes = c("ensembl_gene_id", "ensembl_transcript_id",
+                           "exon_chrom_start", "exon_chrom_end"),
+            filters = "ensembl_transcript_id",
+            values = canonical_transcript$ensembl_transcript_id,
+            mart = ensembl
+          )
+          
+          # Process exon information
+          in_exon <- any(pos >= exon_info$exon_chrom_start & pos <= exon_info$exon_chrom_end)
+          
+          # Add information to results
+          result$gene_name <- canonical_transcript$external_gene_name
+          result$refseq_mrna <- canonical_transcript$refseq_mrna
+          result$transcript_length <- canonical_transcript$transcript_length
+          result$position_type <- if(in_exon) "exonic" else "intronic"
+          result$ensembl_transcript_id <- canonical_transcript$ensembl_transcript_id
+          
+          # Calculate transcript position
+          exon_info <- exon_info[order(exon_info$exon_chrom_start), ]
+          if(result$strand == "-") {
+            exon_info <- exon_info[nrow(exon_info):1, ]
+          }
+          
+          # Find containing exon
+          containing_exon <- which(pos >= exon_info$exon_chrom_start & 
+                                     pos <= exon_info$exon_chrom_end)
+          
+          # Calculate transcript position
+          transcript_pos <- 0
+          
+          if(length(containing_exon) > 0) {
+            if(containing_exon > 1) {
+              for(i in 1:(containing_exon-1)) {
+                transcript_pos <- transcript_pos + 
+                  (exon_info$exon_chrom_end[i] - exon_info$exon_chrom_start[i] + 1)
+              }
+            }
+            
+            transcript_pos <- transcript_pos + 
+              (pos - exon_info$exon_chrom_start[containing_exon] + 1)
+            
+            result$transcript_position <- transcript_pos
+          } else {
+            result$transcript_position <- NA
+          }
+          
+          result$Fprimer_to <- result$transcript_position - 50
+          result$Rprimer_from <- result$transcript_position + 50
+        }
+      }
+      
+      # Append to all_results
+      all_results <- rbind(all_results, result)
+      
+    }, error = function(e) {
+      warning(paste("Error processing coordinate:", coordinate, "\n", e))
+    })
+  }
+  
+  # Write results to Excel using the provided or default filename
+  write.xlsx(all_results, output_file)
+  
+  return(all_results)
+}
+
+
+coordinates <- c("chr3:179587991", "chr12:21501357")  # Add your coordinates
+results <- process_coordinates(coordinates)
+
+#
+# take the excel file, use it to run Primer Blast
+#
+
+process_amplicons <- function(input_file, output_prefix = "amplicons") {
+  
+  # Read input file
+  amplicons_df <- read.xlsx(input_file, sheet = "Amplicons")
+  
+  # Initialize vectors to store results
+  amplicon_sequences <- vector("character", nrow(amplicons_df))
+  relative_positions <- vector("numeric", nrow(amplicons_df))
+  chrom_ids <- vector("character", nrow(amplicons_df))
+  
+  # Initialize lists to store BED entries
+  bed_entries <- list()
+  bed_position_entries <- list()
+  fasta_entries <- list()
+  
+  # Process each row
+  for(i in 1:nrow(amplicons_df)) {
+    tryCatch({
+      # Get transcript sequence
+      transcript_seq <- getBM(
+        attributes = c("refseq_mrna", "cdna"),
+        filters = "refseq_mrna",
+        values = amplicons_df$refseq_mrna[i],
+        mart = ensembl
+      )
+      
+      if(nrow(transcript_seq) > 0) {
+        # Extract amplicon sequence
+        amplicon_seq <- substr(transcript_seq$cdna[1], 
+                               amplicons_df$amplicon_start[i], 
+                               amplicons_df$amplicon_end[i])
+        
+        # Create chromosome identifier
+        chrom_id <- paste0(amplicons_df$gene_name[i], "_", 
+                           amplicons_df$chr[i], "_", 
+                           amplicons_df$pos[i])
+        
+        print(paste("Position:", chrom_id))
+        
+        # Calculate relative position
+        relative_position <- amplicons_df$transcript_position[i] - 
+          amplicons_df$amplicon_start[i]
+        
+        
+        # Store results
+        amplicon_sequences[i] <- amplicon_seq
+        relative_positions[i] <- relative_position
+        chrom_ids[i] <- chrom_id
+        
+        # Create BED entries
+        bed_entries[[i]] <- data.frame(
+          chrom = chrom_id,
+          start = 0,
+          end = nchar(amplicon_seq),
+          name = amplicons_df$gene_name[i],
+          score = 0,
+          strand = "+",
+          stringsAsFactors = FALSE
+        )
+        
+        bed_position_entries[[i]] <- data.frame(
+          chrom = chrom_id,
+          start = relative_position - 1,
+          end = relative_position,
+          name = amplicons_df$gene_name[i],
+          score = 0,
+          strand = "+",
+          stringsAsFactors = FALSE
+        )
+        
+        # Create FASTA entries
+        fasta_entries[[i]] <- c(
+          paste0(">", chrom_id),
+          amplicon_seq
+        )
+        
+        # Validate T position
+        base_at_position <- substr(amplicon_seq, relative_position + 1, relative_position + 1)
+        if(base_at_position != "T") {
+          warning(paste("Row", i, ": Base at relative position", relative_position, 
+                        "is", base_at_position, "not T"))
+        }
+      }
+    }, error = function(e) {
+      warning(paste("Error processing row", i, ":", e$message))
+    })
+  }
+  
+  # Add new columns to the dataframe
+  amplicons_df$amplicon_sequence <- amplicon_sequences
+  amplicons_df$relative_position <- relative_positions
+  amplicons_df$chrom_id <- chrom_ids
+  
+  # Combine BED entries into single dataframes
+  bed_df <- do.call(rbind, bed_entries)
+  bed_position_df <- do.call(rbind, bed_position_entries)
+  
+  # Write outputs
+  # 1. Excel file
+  write.xlsx(amplicons_df, paste0(output_prefix, ".xlsx"))
+  
+  # 2. FASTA file
+  writeLines(unlist(fasta_entries), paste0(output_prefix, ".fasta"))
+  
+  # 3. BED files
+  write.table(bed_df, 
+              paste0(output_prefix, ".bed"), 
+              sep = "\t", 
+              quote = FALSE, 
+              row.names = FALSE, 
+              col.names = FALSE)
+  
+  write.table(bed_position_df, 
+              paste0(output_prefix, "_position.bed"), 
+              sep = "\t", 
+              quote = FALSE, 
+              row.names = FALSE, 
+              col.names = FALSE)
+  
+  # Return results as a list
+  return(list(
+    dataframe = amplicons_df,
+    bed_full = bed_df,
+    bed_position = bed_position_df,
+    fasta = unlist(fasta_entries)
+  ))
+}
+
+# Example usage
+results <- process_amplicons("input_file.xlsx", "output_prefix")
