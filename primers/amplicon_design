@@ -204,8 +204,8 @@ process_amplicons <- function(input_file, output_prefix = "amplicons") {
         
         bed_position_entries[[i]] <- data.frame(
           chrom = chrom_id,
-          start = relative_position - 1,
-          end = relative_position,
+          start = relative_position,
+          end = relative_position + 1,
           name = amplicons_df$gene_name[i],
           score = 0,
           strand = "+",
