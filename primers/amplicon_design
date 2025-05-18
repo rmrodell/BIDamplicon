@@ -195,6 +195,10 @@ process_amplicons <- function(input_file, output_prefix = "amplicons") {
           name = amplicons_df$gene_name[i],
           score = 0,
           strand = "+",
+          column7 = "NA",
+          column8 = "gene",
+          column9 = "NA",
+          column10 = "NA",
           stringsAsFactors = FALSE
         )
         
@@ -205,6 +209,10 @@ process_amplicons <- function(input_file, output_prefix = "amplicons") {
           name = amplicons_df$gene_name[i],
           score = 0,
           strand = "+",
+          column7 = "NA",
+          column8 = "gene",
+          column9 = "NA",
+          column10 = "NA",
           stringsAsFactors = FALSE
         )
         
