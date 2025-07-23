@@ -2,15 +2,20 @@
 
 print("Initializing the package...")
 
-library(optparse)
-library(data.table)
-library(GenomicRanges)
-library(GenomicAlignments)
+suppressPackageStartupMessages({
+  library(future)
+  library(future.apply)
+  library(future.callr)
+  library(optparse)
+  library(data.table)
+  library(GenomicRanges)
+  library(GenomicAlignments)
+})
 
 
 # get the current working directory
 wdir = getwd( ) 
-print(wdir)
+print(paste("Script is running in the following directory:", wdir))
 
 
 # Define option list with more descriptive names
@@ -63,13 +68,20 @@ bam.dir = as.character(opt$bamFile) # bam file with reads to be analyzed
 print("------------------------------------")
 print("Data Preparation...")
 
+# Record the start time
+print(paste("Starting counting at", format(Sys.time(), "%Y-%m-%d %H:%M:%S")))
+
 thebam <- BamFile(bam.dir)
 
 # extract count information from the bam file over the interval defined in the bed
 finalOutput = data.frame()
 totalRows = nrow(bedFile)
-for (i in c(1:nrow(bedFile))){
-  print(paste("Examining", bedFile$gene[i], ", number", i, "out of", totalRows, "total genes."))
+
+# Set up the parallel backend
+plan(callr, workers = availableCores() - 1)
+
+# Parallelize the main loop
+finalOutput <- future_lapply(1:nrow(bedFile), function(i) {
   
   # defines which reads to fetch from the bam file based on positions in the bed
   param <- ScanBamParam(which=GRanges(strand = bedFile$strand[i],
@@ -87,10 +99,10 @@ for (i in c(1:nrow(bedFile))){
   # for the defined region (param)
   PU = pileup(thebam, scanBamParam = param, pileupParam = pilup_params)
   
-  # if no reads mapped to that gene, move on
+  # if no reads mapped to that gene, return NULL
   if (nrow(PU) == 0) {
     print(paste("No reads mapped to", bedFile$gene[i]))
-    next
+    return(NULL)
   }
   
   # filters for reads mapping to desired strand when defined, ignores strand when not
@@ -101,7 +113,7 @@ for (i in c(1:nrow(bedFile))){
   # checks for reads still left after strand filtering
   if (nrow(PU) == 0){
     print(paste("No reads mapped to", bedFile$gene[i]))
-    next
+    return(NULL)
   }
   
   # This creates a new column in the PU dataframe where the nucleotide is corrected 
@@ -129,7 +141,7 @@ for (i in c(1:nrow(bedFile))){
                       "strand"=bedFile$strand[i])
  
   # loops over PU dataframe to aggregate nucleotide counts
-  for (j in c(1:nrow(PU))){
+  for (j in 1:nrow(PU)){
     ro.res.df = which(res.df$pos == PU$pos[j])
     
     if (res.df$reference[ro.res.df] != "T" & res.df$reference[ro.res.df] != "" & !opt$all){
@@ -167,13 +179,13 @@ for (i in c(1:nrow(bedFile))){
     res.df = res.df[which(res.df$reference == "T"),]
   }
   if (nrow(res.df) == 0) {
-    next
+    return(NULL)
   }
   
   # extracts kmer from the sequence
-  for (j in c(1:nrow(res.df))){
+  for (j in 1:nrow(res.df)){
     kmer = ""
-    for (k in c(-2:2)){
+    for (k in -2:2){
       tryCatch({
         gr1 <- GRanges(res.df$chr[j],IRanges(start=res.df$pos[j]+k, end=res.df$pos[j]+k))
         ### Extract the kmers
@@ -199,12 +211,15 @@ for (i in c(1:nrow(bedFile))){
     res.df$kmer[j] = kmer
   }
   
-  # append results for the gene to the finalOutput dataframe
-  if (nrow(res.df) > 0){
-    finalOutput = rbind(finalOutput, res.df)
-  }
-  print(paste("Done examining ", bedFile$gene[i]))
-}
+  
+  return(res.df)
+}, future.seed = TRUE)
+
+# Record the end time
+print(paste("Finished counting at", format(Sys.time(), "%Y-%m-%d %H:%M:%S")))
+
+# Combine results and remove NULL entries
+finalOutput <- do.call(rbind, finalOutput[!sapply(finalOutput, is.null)])
 
 # convert to data table for faster processing
 setDT(finalOutput)
@@ -212,6 +227,9 @@ setDT(finalOutput)
 finalOutput[, totalReads := A.count + C.count + G.count + T.count + Deletion.count + Insertion.count]
 # filter for greater than 20 reads
 finalOutput <- finalOutput[totalReads > 20, ]
+
+# add delrate column
+finalOutput[, delrate := Deletion.count / totalReads]
 
 # save final output to a table
 fwrite(finalOutput, file = opt$outputFile, sep = "\t", row.names = FALSE, quote = FALSE)
