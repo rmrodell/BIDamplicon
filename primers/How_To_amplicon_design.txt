@@ -1,0 +1,40 @@
+Process
+
+1. Create a list of sites where positions of interest for amplicons are located.
+    Sites should be formatted as so: "chr3:179587991", "chr12:21501357" with GRCh38 formatting.
+2. Open the above code in R. Initialize the required libraries and the two functions, process_coordinates and process_amplicons.
+3. Store the coordinates as a list in a variable in R. Use them to run the process_coordinates function. The function works as follows:
+    Determines which strand has a T at the given genomic coordinate.
+    Extracts the canonical RefSeq cDNA sequence from Ensembl for that coordinate and strand.
+    Determines the relative position of the coordinate within the cDNA sequence.
+    Calculates 50 bp prior and 50 bp after the relative position as limits to use in Primer Blast.
+    Writes the results to an excel file which is saved to the working directory.
+4. Take the information in the output excel file, and use it to run PrimerBlast online.
+  1. Input the RefSeq mRNA value in the PCR template box. It will automatically extract the DNA sequence from the RefSeq value.
+  2. Fill in information for the "forward primer to" and "reverse primer from" boxes. This makes sure there is at minimum a 100 bp window around the target coordinate.
+      If one of these is larger than the size of the amplicon, adjust accordingly, keeping in mind primers need at least 25 bp of length.
+  3. Adjust the PCR product size to a minimum of 200 and maximum of 1000 bp.
+  4. Increase primer melting temperatures. Max should be 72C, Opt should be upper 60s.
+  5. Repeat for each row in the spreadsheet independently.
+  6. When the output appears, select the primer pair you like the best, considering:
+      Number of off-target matches
+      Size of the amplicons
+      Overlap with exon junctions
+5. Create a new sheet within the same excel file with the name "Amplicons".
+  1. Copy-paste columns coordinate, chr, pos, strand, gene_name, refseq_mrna, transcript_length, position_type, ensembl_transcript_id, transcript_position to this new sheet.
+  2. Add columns "amplicon_start" and "amplicon_end".
+      Fill with the values from the forward primer "start" coordinate and reverse primer "start" coordinate.
+  3. Save sheet.
+6. Run functions process_amplicons, using the excel file with the Amplicons sheet as the input.
+7. The function outputs the following:
+      Excel spreadsheet that contains all relevant information
+      FASTA file with sequences for the full length of the amplicon
+      BED file that covers the full length of the amplicon, formatted for ModDetect or BIDdetect.
+      BED file that covers the position of the target coordinate, formatted for ModDetect or BIDdetect.
+
+Limitations
+- This program explicitly references the human genome. To use for other organisms, changes will need to be made to the process_coordinates function.
+- The program only works for coordinates located in the coding sequence of mRNA as it is intended to be used with polyA selected RNA. An entirely different approach will be needed for sequences located outside of coding regions in the transcriptome.
+- Excel file format must be followed precisely. 
+- You must open the code in RStudio yourself and modify it there to run it on your sites.
+- You must run the middle PrimerBlast step by hand as it does not integrate with R, or any outside programming, to my knowledge
