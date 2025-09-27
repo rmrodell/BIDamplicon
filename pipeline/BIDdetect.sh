@@ -51,7 +51,14 @@ count_file="${DEST_PATH}/BIDdetect_counts.txt"
 LOG_FILE="${DEST_PATH}/BIDdetect.log"
 
 # Initialize the final output file with headers
-echo -e "sample\tchr\tpos\tgene\ttotalReads\tA.count\tC.count\tG.count\tT.count\tDeletion.count\tInsertion.count\tref\tkmer\tstrand\tdelrate" > "$count_file"
+# echo -e "sample\tchr\tpos\tgene\ttotalReads\tA.count\tC.count\tG.count\tT.count\tDeletion.count\tInsertion.count\tref\tkmer\tstrand\tdelrate" > "$count_file"
+
+# Initialize the final output file with headers ONLY if it doesn't exist
+
+if [ ! -f "$count_file" ]; then
+    echo "Creating new count file: $count_file"
+    echo -e "sample\tchr\tpos\tgene\ttotalReads\tA.count\tC.count\tG.count\tT.count\tDeletion.count\tInsertion.count\tref\tkmer\tstrand\tdelrate" > "$count_file"
+fi
 
 # Create or clear the log file
 echo "Starting BIDdetect processing..." > "$LOG_FILE"
