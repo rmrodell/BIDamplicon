@@ -1,97 +1,156 @@
 #!/bin/bash
-  
-ml R
 
-# Get the directory where BIDdetect.sh is located
+#
+# BIDdetect Pipeline
+#
+# Description:
+#   This script automates the process of running the BIDdetect pipeline. It iterates
+#   through sorted BAM files in a source directory, runs 'bam_counts.R' for each,
+#   aggregates the results, and then runs 'sample_name.R' for final processing.
+#
+
+# Stop the script if any command fails or if an unset variable is used
+set -eu -o pipefail
+
+# Get the directory where this script is located to find the R scripts
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-# First argument is directory with sorted bam files NO FINAL SLASH
-# Second argument is where outputs should go
-# Third argument is path to reference fasta file
-# Fourth argument is path to bed file with regions to examine
+# --- 1. Argument Parsing and Usage ---
 
-# Base path to the sorted & indexed bam files
-BAM_PATH="$1"
-DEST_PATH="$2"
+# Function to display usage information
+usage() {
+    echo "Usage: $0 -b <bam_dir> -o <output_dir> -r <ref_fasta> -e <bed_file> [OPTIONS]"
+    echo ""
+    echo "Required Arguments:"
+    echo "  -b, --bam_dir <dir>      Directory containing sorted and indexed BAM files."
+    echo "  -o, --output_dir <dir>   Directory where all outputs will be created."
+    echo "  -r, --ref_fasta <file>   Path to the reference FASTA file."
+    echo "  -e, --bed_file <file>    Path to the BED file with regions of interest."
+    echo ""
+    echo "Optional Arguments:"
+    echo "  -n, --col_names <str>    Column names string for the final R script."
+    echo "                           (Default: 'celltype_vector_rep_treat')"
+    echo "  -h, --help               Display this help message and exit."
+    echo ""
+    echo "Example:"
+    echo "  $0 --bam_dir ./bams/ --output_dir ./results/ --ref_fasta ref.fa --bed_file regions.bed"
+}
 
-# Check if BAM_PATH exists
-if [ ! -d "$BAM_PATH" ]; then
-    echo "Error: BAM directory '$BAM_PATH' does not exist."
-    exit 1
-fi
+# --- Set Default Optional Arguments ---
+COLUMN_NAMES="celltype_vector_rep_treat"
 
-# Create DEST_PATH if it doesn't exist
-if [ ! -d "$DEST_PATH" ]; then
-    echo "Creating destination directory: $DEST_PATH"
-    mkdir -p "$DEST_PATH"
-    if [ $? -ne 0 ]; then
-        echo "Error: Failed to create destination directory '$DEST_PATH'."
-        exit 1
-    fi
-fi 
+# --- Parse Arguments using getopt ---
+SHORT_OPTS="b:o:r:e:n:h"
+LONG_OPTS="bam_dir:,output_dir:,ref_fasta:,bed_file:,col_names:,help"
+PARSED_OPTS=$(getopt -o "$SHORT_OPTS" --long "$LONG_OPTS" -n "$0" -- "$@")
+if [ $? -ne 0 ]; then usage; exit 1; fi
+eval set -- "$PARSED_OPTS"
 
-# Name other input files
-ref_fa="$3"
-bed="$4"
-
-# Check if reference fasta and bed files exist
-if [ ! -f "$ref_fa" ]; then
-    echo "Error: Reference fasta file '$ref_fa' does not exist."
-    exit 1
-fi
-
-if [ ! -f "$bed" ]; then
-    echo "Error: BED file '$bed' does not exist."
-    exit 1
-fi
-
-# Name where final counts will go
-count_file="${DEST_PATH}/BIDdetect_counts.txt"
-# Log file location
-LOG_FILE="${DEST_PATH}/BIDdetect.log"
-
-# Initialize the final output file with headers
-# echo -e "sample\tchr\tpos\tgene\ttotalReads\tA.count\tC.count\tG.count\tT.count\tDeletion.count\tInsertion.count\tref\tkmer\tstrand\tdelrate" > "$count_file"
-
-# Initialize the final output file with headers ONLY if it doesn't exist
-
-if [ ! -f "$count_file" ]; then
-    echo "Creating new count file: $count_file"
-    echo -e "sample\tchr\tpos\tgene\ttotalReads\tA.count\tC.count\tG.count\tT.count\tDeletion.count\tInsertion.count\tref\tkmer\tstrand\tdelrate" > "$count_file"
-fi
-
-# Create or clear the log file
-echo "Starting BIDdetect processing..." > "$LOG_FILE"
-echo "Log file created at: $LOG_FILE" >> "$LOG_FILE"
-
-(cd "$BAM_PATH"
-# Loop through each .bam file in the input directory
-for bam_file in "$BAM_PATH"/*.bam; do
-
-    sample=$(basename "${bam_file}" _sort.bam)  # Get the base name without the extension
-
-    echo "Processing sample: ${sample}" #>> "$LOG_FILE"
-
-    # Extract counts using bam_counts.R
-    echo "Running R script to count for sample: ${sample}" >> "$LOG_FILE"
-    Rscript "${SCRIPT_DIR}/bam_counts.R" --bedFile "$bed" --bamFile "$bam_file" --referenceFasta "$ref_fa" --outputFile "${sample}_counts.txt" >> "$LOG_FILE" 2>&1
-
-    # Process the resultant file and append it to the final output
-    result_file="${sample}_counts.txt"
-
-    # Append the rest of the lines (skip header)
-    awk -v sample="$sample" 'NR > 1 {print sample "\t" $0}' "$result_file" >> "$count_file"
-
-    echo "Counts for sample ${sample} appended to ${count_file}" >> "$LOG_FILE"
+while true; do
+    case "$1" in
+        -b|--bam_dir)    BAM_DIR="$2"; shift 2 ;;
+        -o|--output_dir) DEST_DIR="$2"; shift 2 ;;
+        -r|--ref_fasta)  REF_FA="$2"; shift 2 ;;
+        -e|--bed_file)   BED_FILE="$2"; shift 2 ;;
+        -n|--col_names)  COLUMN_NAMES="$2"; shift 2 ;;
+        -h|--help)       usage; exit 0 ;;
+        --)              shift; break ;;
+        *)               echo "Internal error!"; exit 1 ;;
+    esac
 done
-)
 
-echo "All files counted. Final count file located at $count_file" >> "$LOG_FILE"
+# --- 2. Input Validation ---
 
-output_file="${DEST_PATH}/BIDdetect_data.txt"
+# Check for missing required arguments and validate paths
+if [ -z "${BAM_DIR-}" ] || [ -z "${DEST_DIR-}" ] || [ -z "${REF_FA-}" ] || [ -z "${BED_FILE-}" ]; then
+    echo "Error: One or more required arguments are missing."
+    usage
+    exit 1
+fi
+if [ ! -d "$BAM_DIR" ]; then echo "Error: BAM directory not found: $BAM_DIR"; exit 1; fi
+if [ ! -f "$REF_FA" ]; then echo "Error: Reference FASTA not found: $REF_FA"; exit 1; fi
+if [ ! -f "$BED_FILE" ]; then echo "Error: BED file not found: $BED_FILE"; exit 1; fi
 
-# Split sample name into different columns
-echo "Running R script to split sample names..." >> "$LOG_FILE"
-Rscript "${SCRIPT_DIR}/sample_name.R" "$count_file" "$output_file" celltype_vector_rep_treat >> "$LOG_FILE" 2>&1
+# --- 3. Setup Environment and Logging ---
 
-echo "Processing completed. Log file located at $LOG_FILE" >> "$LOG_FILE"
+# Load required modules
+ml R
+
+# Create output directories
+LOG_DIR="${DEST_DIR}/logs"
+INTERMEDIATE_DIR="${DEST_DIR}/intermediate_counts"
+mkdir -p "$DEST_DIR" "$LOG_DIR" "$INTERMEDIATE_DIR"
+
+# Set up comprehensive logging to a timestamped file and the console
+LOG_FILE="${LOG_DIR}/BIDdetect_$(date +%Y%m%d_%H%M%S).log"
+exec &> >(tee -a "$LOG_FILE")
+
+echo "--- BIDdetect Pipeline Started: $(date) ---"
+echo "BAM Directory:        $BAM_DIR"
+echo "Output Directory:     $DEST_DIR"
+echo "Reference FASTA:      $REF_FA"
+echo "BED File:             $BED_FILE"
+echo "Final Column Names:   $COLUMN_NAMES"
+echo "Log file:             $LOG_FILE"
+echo "-------------------------------------------------"
+
+# --- 4. Main Processing Loop ---
+
+# Define the master file for aggregated counts
+master_count_file="${DEST_DIR}/BIDdetect_counts.txt"
+
+# Initialize the master file with headers if it doesn't exist
+if [ ! -f "$master_count_file" ]; then
+    echo "Creating new master count file: $master_count_file"
+    echo -e "sample\tchr\tpos\tgene\ttotalReads\tA.count\tC.count\tG.count\tT.count\tDeletion.count\tInsertion.count\tref\tkmer\tstrand\tdelrate" > "$master_count_file"
+fi
+
+# Check if there are any BAM files to process
+if ! ls "${BAM_DIR}"/*.bam 1> /dev/null 2>&1; then
+    echo "Error: No .bam files found in '$BAM_DIR'."
+    exit 1
+fi
+
+# Loop through each .bam file in the input directory
+for bam_file in "$BAM_DIR"/*.bam; do
+
+    # Derives sample name from file, removing '_sort.bam' or just '.bam'
+    sample=$(basename "${bam_file}" .bam | sed 's/_sort$//')
+    echo "--- Processing sample: ${sample} ---"
+
+    # Define path for the intermediate result file for this sample
+    intermediate_result_file="${INTERMEDIATE_DIR}/${sample}_counts.txt"
+
+    echo "Running R script to generate counts..."
+    Rscript "${SCRIPT_DIR}/bam_counts.R" \
+        --bedFile "$BED_FILE" \
+        --bamFile "$bam_file" \
+        --referenceFasta "$REF_FA" \
+        --outputFile "$intermediate_result_file"
+
+    echo "Appending results to master count file..."
+    # Append the results to the master file, skipping the header line
+    awk -v sample="$sample" 'NR > 1 {print sample "\t" $0}' "$intermediate_result_file" >> "$master_count_file"
+
+    echo "Finished processing sample: ${sample}"
+done
+
+echo "-------------------------------------------------"
+echo "All samples have been processed."
+
+# --- 5. Final Processing and Cleanup ---
+
+final_output_file="${DEST_DIR}/BIDdetect_data.txt"
+
+echo "Running final R script to format sample names..."
+Rscript "${SCRIPT_DIR}/sample_name.R" "$master_count_file" "$final_output_file" "$COLUMN_NAMES"
+
+# Optional: Uncomment the line below to automatically clean up intermediate files
+# rm -rf "$INTERMEDIATE_DIR"
+
+echo "--- Pipeline finished successfully! ---"
+echo "Final formatted data is at: $final_output_file"
+echo "Aggregated raw counts are at: $master_count_file"
+
+
+
