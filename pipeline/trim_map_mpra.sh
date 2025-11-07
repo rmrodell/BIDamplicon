@@ -105,7 +105,7 @@ fi
 
 # Define output directories based on parsed info
 PROJECT_DIR="${TOP_LEVEL_OUTPUT_DIR}/${SAMPLE_ID}"
-FINAL_COMMON_DIR="${TOP_LEVEL_OUTPUT_DIR}/deduplicated_bam"
+FINAL_COMMON_DIR="${TOP_LEVEL_OUTPUT_DIR}/final_bam"
 
 # Load modules
 ml biology py-cutadapt/1.18_py36 samtools
@@ -118,11 +118,10 @@ set -o pipefail
 ################################################################################
 ###                  USER DEFINED VARIABLES                                  ###
 ################################################################################
-SENSE_ADAPTER_5PRIME="TTTCTGTTGGTGCTGATATTGCG"
-SENSE_ADAPTER_3PRIME="GAAGATAGAGCGACAGGCAAGT"
-ANTISENSE_ADAPTER_5PRIME="ACTTGCCTGTCGCTCTATCTTC"
-ANTISENSE_ADAPTER_3PRIME="CGCAATATCAGCACCAACAGAAA"
-UMI_PATTERN="NNNNNNNNNN"
+POOL_SENSE_ADAPTER_5PRIME="GACGCTCTTCCGATCT"
+POOL_SENSE_ADAPTER_3PRIME="CACTCGGGCACCAAGGAC"
+POOL_ANTISENSE_ADAPTER_5PRIME="GTCCTTGGTGCCCGAGTG"
+POOL_ANTISENSE_ADAPTER_3PRIME="AGATCGGAAGAGCGTC"
 
 # SLURM-aware thread count
 if [ -n "$SLURM_CPUS_PER_TASK" ]; then THREADS="$SLURM_CPUS_PER_TASK"; else THREADS=1; fi
@@ -149,7 +148,7 @@ track_metrics() {
     echo -e "${step_name}\t${SAMPLE_ID}\t$(basename "$file_path")\t${count}\t${size}" >> "$METRICS_FILE"
 }
 
-# --- CORRECTED & SIMPLIFIED DIRECTORY DEFINITIONS ---
+# --- DIRECTORY DEFINITIONS ---
 TMP_DIR="${PROJECT_DIR}/tmp"
 FINAL_DIR="${PROJECT_DIR}/final"
 LOGS_DIR="${PROJECT_DIR}/logs"
@@ -175,12 +174,9 @@ SENSE_TRIM1_RAW="${TMP_DIR}/${SAMPLE_ID}_sense_trim1_raw.fastq"
 ANTISENSE_TRIM1_RAW="${TMP_DIR}/${SAMPLE_ID}_antisense_trim1_raw.fastq"
 ANTISENSE_TRIM1_RC="${TMP_DIR}/${SAMPLE_ID}_antisense_trim1_rc.fastq"
 COMBINED_TRIM1="${TMP_DIR}/${SAMPLE_ID}_all_sense_trim1.fastq"
-COMBINED_UMI="${TMP_DIR}/${SAMPLE_ID}_all_sense_umi.fastq"
 MAPPED_SAM="${TMP_DIR}/${SAMPLE_ID}_mapped.sam"
-MAPPED_BAM="${TMP_DIR}/${SAMPLE_ID}_mapped_sorted.bam"
-DEDUP_BAM="${FINAL_DIR}/${SAMPLE_ID}_deduplicated.bam"
+MAPPED_BAM="${FINAL_DIR}/${SAMPLE_ID}_mapped_sorted.bam"
 MINIMAP2_LOG="${LOGS_DIR}/${SAMPLE_ID}_minimap2_mapping.log"
-DEDUP_LOG="${LOGS_DIR}/${SAMPLE_ID}_umi_tools_dedup.log"
 
 # --- 1. Setup Read Tracking ---
 log_message "Step 1: Start Read Tracking..."
@@ -199,7 +195,7 @@ cutadapt \
     -O 15 \
     --cores="$THREADS" \
     --discard-untrimmed \
-    -g "$SENSE_ADAPTER_5PRIME...$SENSE_ADAPTER_3PRIME" \
+    -g "$POOL_SENSE_ADAPTER_5PRIME...$POOL_SENSE_ADAPTER_3PRIME" \
     -o "$SENSE_TRIM1_RAW" \
     "$RAW_FASTQ" \
     > "${LOGS_DIR}/${SAMPLE_ID}_cutadapt_sense_filter.log"
@@ -212,7 +208,7 @@ cutadapt \
     -O 15 \
     --cores="$THREADS" \
     --discard-untrimmed \
-    -g "$ANTISENSE_ADAPTER_5PRIME...$ANTISENSE_ADAPTER_3PRIME" \
+    -g "$POOL_ANTISENSE_ADAPTER_5PRIME...$POOL_ANTISENSE_ADAPTER_3PRIME" \
     -o "$ANTISENSE_TRIM1_RAW" \
     "$RAW_FASTQ" \
     > "${LOGS_DIR}/${SAMPLE_ID}_cutadapt_antisense_filter.log"
@@ -235,60 +231,40 @@ cat "$SENSE_TRIM1_RAW" "$ANTISENSE_TRIM1_RC" > "$COMBINED_TRIM1"
 track_metrics "3b_Combined_Trim1" "$COMBINED_TRIM1"
 end_time=$(date +%s); log_message "Step 3 finished. Duration: $(format_duration $((end_time - start_time)))"
 
-# --- 4. Extract UMIs from Combined File ---
-log_message "Step 4: Extracting UMIs from 3' end of all reads..."
-start_time=$(date +%s)
-umi_tools extract -I "$COMBINED_TRIM1" --extract-method=string --bc-pattern="$UMI_PATTERN" --3prime -L "${LOGS_DIR}/${SAMPLE_ID}_umi_tools.log" > "$COMBINED_UMI"
-track_metrics "4_Combined_UMI" "$COMBINED_UMI"
-end_time=$(date +%s); log_message "Step 4 finished. Duration: $(format_duration $((end_time - start_time)))"
-
-# --- 5. Map reads with Minimap2 ---
-log_message "Step 5: Mapping reads with Minimap2..."
+# --- 4. Map reads with Minimap2 ---
+log_message "Step 4: Mapping reads with Minimap2..."
 start_time=$(date +%s)
 
 $OAK/rodell/minimap2/minimap2 \
     -a \
     "$REF_FA" \
-    "$COMBINED_UMI" \
+    "$COMBINED_TRIM1" \
     -k5 -t "$THREADS" \
     > "$MAPPED_SAM"
 
-track_metrics "5_Mapped_SAM" "$MAPPED_SAM"
-end_time=$(date +%s); log_message "Step 5 finished. Duration: $(format_duration $((end_time - start_time)))"
+track_metrics "4_Mapped_SAM" "$MAPPED_SAM"
+end_time=$(date +%s); log_message "Step 4 finished. Duration: $(format_duration $((end_time - start_time)))"
 
-# --- 6. Convert to Sorted BAM and Index ---
-log_message "Step 6: Converting SAM to sorted BAM and indexing..."
+# --- 5. Convert to Sorted BAM and Index ---
+log_message "Step 5: Converting SAM to sorted BAM and indexing..."
 start_time=$(date +%s)
 samtools view -@ "$THREADS" -b "$MAPPED_SAM" | samtools sort -@ "$THREADS" -o "$MAPPED_BAM"
-samtools index "$MAPPED_BAM"
-track_metrics "6_Sorted_BAM" "$MAPPED_BAM"
-end_time=$(date +%s); log_message "Step 6 finished. Duration: $(format_duration $((end_time - start_time)))"
+track_metrics "5_Sorted_BAM" "$MAPPED_BAM"
+end_time=$(date +%s); log_message "Step 5 finished. Duration: $(format_duration $((end_time - start_time)))"
 
-# --- 7. Deduplicate Reads with UMI-tools ---
-log_message "Step 7: Deduplicating reads with UMI-tools and indexing..."
-start_time=$(date +%s)
-umi_tools dedup \
-    --method directional \
-    -I "$MAPPED_BAM" \
-    -S "$DEDUP_BAM" \
-    -L "$DEDUP_LOG"
-track_metrics "7_Deduplicated_BAM" "$DEDUP_BAM"
-end_time=$(date +%s); log_message "Step 7 finished. Duration: $(format_duration $((end_time - start_time)))"
-
-
-# --- Step 8: Copy Final BAM to Common Output Directory ---
-log_message "Step 8: Copying and indexing final BAM..."
+# --- 6: Copy Final BAM to Common Output Directory ---
+log_message "Step 6: Copying and indexing final BAM..."
 start_time=$(date +%s)
 
 DEST_BAM_PATH="${FINAL_COMMON_DIR}/${SAMPLE_ID}.bam"
 
 # 1. Copy the file
-cp "$DEDUP_BAM" "$DEST_BAM_PATH"
+cp "$MAPPED_BAM" "$DEST_BAM_PATH"
 log_message "  - Copied to: ${DEST_BAM_PATH}"
 
 # 2. Verify the copy with md5sum
 log_message "  - Verifying file integrity with md5sum..."
-source_md5=$(md5sum "$DEDUP_BAM" | awk '{print $1}')
+source_md5=$(md5sum "$MAPPED_BAM" | awk '{print $1}')
 dest_md5=$(md5sum "$DEST_BAM_PATH" | awk '{print $1}')
 
 # 3. Compare checksums and act accordingly
@@ -305,12 +281,10 @@ fi
 # 4. Index the bam file
 samtools index "$DEST_BAM_PATH"
 
-# --- Step 9: Clean up intermediate files ---
-log_message "Step 9: Intermediate file cleanup is currently disabled."
+# --- Step 7: Clean up intermediate files ---
+# log_message "Step 7: Remove intermediary files."
 # rm -rf "$TMP_DIR"
 
 log_message "--- Pipeline for ${SAMPLE_ID} finished successfully! ---"
-
-# --- Step 10: Display Final Metrics Report ---
-log_message "Step 10: Displaying run metrics summary for ${SAMPLE_ID}:"
+log_message "Displaying run metrics summary for ${SAMPLE_ID}:"
 column -t -s $'\t' "$METRICS_FILE"

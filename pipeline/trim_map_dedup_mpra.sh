@@ -122,6 +122,8 @@ SENSE_ADAPTER_5PRIME="TTTCTGTTGGTGCTGATATTGCG"
 SENSE_ADAPTER_3PRIME="GAAGATAGAGCGACAGGCAAGT"
 ANTISENSE_ADAPTER_5PRIME="ACTTGCCTGTCGCTCTATCTTC"
 ANTISENSE_ADAPTER_3PRIME="CGCAATATCAGCACCAACAGAAA"
+POOL_SENSE_ADAPTER_5PRIME="GACGCTCTTCCGATCT"
+POOL_SENSE_ADAPTER_3PRIME="CACTCGGGCACCAAGGAC"
 UMI_PATTERN="NNNNNNNNNN"
 
 # SLURM-aware thread count
@@ -149,7 +151,7 @@ track_metrics() {
     echo -e "${step_name}\t${SAMPLE_ID}\t$(basename "$file_path")\t${count}\t${size}" >> "$METRICS_FILE"
 }
 
-# --- CORRECTED & SIMPLIFIED DIRECTORY DEFINITIONS ---
+# --- DIRECTORY DEFINITIONS ---
 TMP_DIR="${PROJECT_DIR}/tmp"
 FINAL_DIR="${PROJECT_DIR}/final"
 LOGS_DIR="${PROJECT_DIR}/logs"
@@ -176,6 +178,7 @@ ANTISENSE_TRIM1_RAW="${TMP_DIR}/${SAMPLE_ID}_antisense_trim1_raw.fastq"
 ANTISENSE_TRIM1_RC="${TMP_DIR}/${SAMPLE_ID}_antisense_trim1_rc.fastq"
 COMBINED_TRIM1="${TMP_DIR}/${SAMPLE_ID}_all_sense_trim1.fastq"
 COMBINED_UMI="${TMP_DIR}/${SAMPLE_ID}_all_sense_umi.fastq"
+COMBINED_TRIM2="${TMP_DIR}/${SAMPLE_ID}_all_sense_trim2.fastq"
 MAPPED_SAM="${TMP_DIR}/${SAMPLE_ID}_mapped.sam"
 MAPPED_BAM="${TMP_DIR}/${SAMPLE_ID}_mapped_sorted.bam"
 DEDUP_BAM="${FINAL_DIR}/${SAMPLE_ID}_deduplicated.bam"
@@ -242,42 +245,53 @@ umi_tools extract -I "$COMBINED_TRIM1" --extract-method=string --bc-pattern="$UM
 track_metrics "4_Combined_UMI" "$COMBINED_UMI"
 end_time=$(date +%s); log_message "Step 4 finished. Duration: $(format_duration $((end_time - start_time)))"
 
-# --- 5. Map reads with Minimap2 ---
-log_message "Step 5: Mapping reads with Minimap2..."
+# --- 5. Perform Final Trimming on Combined File ---
+log_message "Step 5: Performing secondary trimming on all reads..."
+start_time=$(date +%s)
+cutadapt --discard-untrimmed -m 120 -O 10 --cores="$THREADS" \
+    -g "$POOL_SENSE_ADAPTER_5PRIME...$POOL_SENSE_ADAPTER_3PRIME" \
+    -o "$COMBINED_TRIM2" \
+    "$COMBINED_UMI" > "${LOGS_DIR}/${SAMPLE_ID}_cutadapt_final_trim.log"
+
+track_metrics "5_Final_Trimmed" "$COMBINED_TRIM2"
+end_time=$(date +%s); log_message "Step 5 finished. Duration: $(format_duration $((end_time - start_time)))"
+
+# --- 6. Map reads with Minimap2 ---
+log_message "Step 6: Mapping reads with Minimap2..."
 start_time=$(date +%s)
 
 $OAK/rodell/minimap2/minimap2 \
     -a \
     "$REF_FA" \
-    "$COMBINED_UMI" \
+    "$COMBINED_TRIM2" \
     -k5 -t "$THREADS" \
     > "$MAPPED_SAM"
 
-track_metrics "5_Mapped_SAM" "$MAPPED_SAM"
-end_time=$(date +%s); log_message "Step 5 finished. Duration: $(format_duration $((end_time - start_time)))"
+track_metrics "6_Mapped_SAM" "$MAPPED_SAM"
+end_time=$(date +%s); log_message "Step 6 finished. Duration: $(format_duration $((end_time - start_time)))"
 
-# --- 6. Convert to Sorted BAM and Index ---
-log_message "Step 6: Converting SAM to sorted BAM and indexing..."
+# --- 7. Convert to Sorted BAM and Index ---
+log_message "Step 7: Converting SAM to sorted BAM and indexing..."
 start_time=$(date +%s)
 samtools view -@ "$THREADS" -b "$MAPPED_SAM" | samtools sort -@ "$THREADS" -o "$MAPPED_BAM"
 samtools index "$MAPPED_BAM"
-track_metrics "6_Sorted_BAM" "$MAPPED_BAM"
-end_time=$(date +%s); log_message "Step 6 finished. Duration: $(format_duration $((end_time - start_time)))"
+track_metrics "7_Sorted_BAM" "$MAPPED_BAM"
+end_time=$(date +%s); log_message "Step 7 finished. Duration: $(format_duration $((end_time - start_time)))"
 
-# --- 7. Deduplicate Reads with UMI-tools ---
-log_message "Step 7: Deduplicating reads with UMI-tools and indexing..."
+# --- 8. Deduplicate Reads with UMI-tools ---
+log_message "Step 8: Deduplicating reads with UMI-tools and indexing..."
 start_time=$(date +%s)
 umi_tools dedup \
     --method directional \
     -I "$MAPPED_BAM" \
     -S "$DEDUP_BAM" \
     -L "$DEDUP_LOG"
-track_metrics "7_Deduplicated_BAM" "$DEDUP_BAM"
-end_time=$(date +%s); log_message "Step 7 finished. Duration: $(format_duration $((end_time - start_time)))"
+track_metrics "8_Deduplicated_BAM" "$DEDUP_BAM"
+end_time=$(date +%s); log_message "Step 8 finished. Duration: $(format_duration $((end_time - start_time)))"
 
 
-# --- Step 8: Copy Final BAM to Common Output Directory ---
-log_message "Step 8: Copying and indexing final BAM..."
+# --- Step 9: Copy Final BAM to Common Output Directory ---
+log_message "Step 9: Copying and indexing final BAM..."
 start_time=$(date +%s)
 
 DEST_BAM_PATH="${FINAL_COMMON_DIR}/${SAMPLE_ID}.bam"
@@ -305,8 +319,8 @@ fi
 # 4. Index the bam file
 samtools index "$DEST_BAM_PATH"
 
-# --- Step 9: Clean up intermediate files ---
-log_message "Step 9: Intermediate file cleanup is currently disabled."
+# --- Step 10: Clean up intermediate files ---
+# log_message "Step 10: Remove intermediary files."
 # rm -rf "$TMP_DIR"
 
 log_message "--- Pipeline for ${SAMPLE_ID} finished successfully! ---"

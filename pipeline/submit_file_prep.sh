@@ -138,8 +138,8 @@ echo "Found $N_JOBS samples to process."
 # Submit the array job
 echo "Submitting array job..."
 sbatch \
-    --job-name="SHAPE_prep" \
-    --array=1-"$N_JOBS" \
+    --job-name="BID_prep" \
+    --array=1-"$N_JOBS"%32 \
     --cpus-per-task="$CPU_PER_JOB" \
     --mem="$MEM_PER_JOB" \
     --time="$TIME_LIMIT" \
