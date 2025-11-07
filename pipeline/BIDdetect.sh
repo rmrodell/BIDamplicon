@@ -5,7 +5,7 @@
 #
 # Description:
 #   This script automates the process of running the BIDdetect pipeline. It iterates
-#   through sorted BAM files in a source directory, runs 'bam_counts.R' for each,
+#   through sorted BAM files in a source directory, runs 'bam_counts_fast.R' for each,
 #   aggregates the results, and then runs 'sample_name.R' for final processing.
 #
 
@@ -122,7 +122,7 @@ for bam_file in "$BAM_DIR"/*.bam; do
     intermediate_result_file="${INTERMEDIATE_DIR}/${sample}_counts.txt"
 
     echo "Running R script to generate counts..."
-    Rscript "${SCRIPT_DIR}/bam_counts.R" \
+    Rscript "${SCRIPT_DIR}/bam_counts_fast.R" \
         --bedFile "$BED_FILE" \
         --bamFile "$bam_file" \
         --referenceFasta "$REF_FA" \
