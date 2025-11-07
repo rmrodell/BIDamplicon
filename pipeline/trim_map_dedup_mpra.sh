@@ -96,12 +96,54 @@ IFS=':' read -r SAMPLE_ID BARCODE <<< "$TASK_INFO"
 SAMPLE_ID=$(echo "$SAMPLE_ID" | xargs)
 BARCODE=$(echo "$BARCODE" | xargs)
 
-# Find the specific input FASTQ file
-RAW_FASTQ=$(find "$FQ_SOURCE_DIR" -name "${SAMPLE_ID}.fastq.gz" | head -n 1)
+# --- Locate and Prepare Input FASTQ File ---
+RAW_FASTQ=""
+
+# Strategy 1: Check for a subdirectory named after the barcode containing multiple FASTQ files
+BARCODE_SUBDIR="${FQ_SOURCE_DIR}/${BARCODE}"
+if [ -d "$BARCODE_SUBDIR" ]; then
+    echo "Info: Found barcode subdirectory: ${BARCODE_SUBDIR}"
+    # Find all .fastq.gz files within the barcode subdirectory
+    SOURCE_FILES=$(find "${BARCODE_SUBDIR}" -type f -name "*.fastq.gz")
+    if [ -n "$SOURCE_FILES" ]; then
+        # Define and create a directory for the concatenated FASTQs
+        CONCAT_FQ_DIR="${TOP_LEVEL_OUTPUT_DIR}/00_concatenated_fastqs"
+        mkdir -p "$CONCAT_FQ_DIR"
+        # Define the path for the single, concatenated FASTQ
+        RAW_FASTQ="${CONCAT_FQ_DIR}/${SAMPLE_ID}.fastq.gz"
+        echo "Info: Concatenating multiple FASTQ files into: ${RAW_FASTQ}"
+        zcat $SOURCE_FILES | gzip -c > "$RAW_FASTQ"
+        
+        if [ $? -ne 0 ]; then
+            echo "Error: Concatenation failed for sample ${SAMPLE_ID}."
+            exit 1
+        fi
+    else
+        echo "Warning: Barcode subdirectory '${BARCODE_SUBDIR}' exists but contains no .fastq.gz files."
+    fi
+fi
+
+# Strategy 2 : If no concatenated file was created, look for a single FASTQ named after the sample ID
 if [ -z "$RAW_FASTQ" ]; then
-    echo "Error: Could not find FASTQ file for sample '$SAMPLE_ID' in '$FQ_SOURCE_DIR'."
+    echo "Barcode subdirectory not found or was empty. Searching for a single file."
+    CANDIDATE_FQ=$(find "$FQ_SOURCE_DIR" -maxdepth 1 -name "${SAMPLE_ID}.fastq.gz" | head -n 1)
+    if [ -n "$CANDIDATE_FQ" ]; then
+        RAW_FASTQ="$CANDIDATE_FQ"
+        echo "Info: Found single FASTQ file: ${RAW_FASTQ}"
+    fi
+fi
+
+# Final Check: Ensure a FASTQ file was found by one of the strategies
+if [ -z "$RAW_FASTQ" ]; then
+    echo "Error: Could not find input FASTQ data for sample '${SAMPLE_ID}' (barcode: '${BARCODE}')."
+    echo "  - Searched for subdirectory with FASTQs: ${BARCODE_SUBDIR}/"
+    echo "  - Searched for a single file: ${FQ_SOURCE_DIR}/${SAMPLE_ID}.fastq.gz"
     exit 1
 fi
+
+echo "Input FASTQ for processing: ${RAW_FASTQ}"
+echo "" # Add a blank line for readability
+
 
 # Define output directories based on parsed info
 PROJECT_DIR="${TOP_LEVEL_OUTPUT_DIR}/${SAMPLE_ID}"
