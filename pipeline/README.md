@@ -55,3 +55,9 @@ Its steps are:
 4. Align Reads: It maps the UMI-tagged reads to a reference genome using minimap2 and converts the resulting SAM output into a sorted BAM file with samtools.
 5. Finalize and Clean Up: It copies the final, deduplicated BAM file to a common output directory, verifies the copy's integrity with a checksum, indexes the file, and removes temporary intermediate files.
 6. Reporting: Throughout the process, it tracks read counts and file sizes at each major step, printing a final summary table to the log.
+
+KEY DIFFERNECES TO NOTE:
+- Does not take a mapping file
+- Input fastq files should already be named with the sample name.
+- Input fastq files are not gzipped.
+This truly is rather custom built for the mess I made of the Nov2024 Pool1 sequencing. Here's to learning and growing.

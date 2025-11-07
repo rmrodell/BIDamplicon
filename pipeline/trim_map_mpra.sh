@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# A generalized pipeline for processing fastq files for Nano-BID-Amp processing.
+# A pipeline for processing fastq files for Nano-BID-Amp processing.
 # This script is designed to be called as a SLURM array task.
 #
 
@@ -49,16 +49,12 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Check if all required arguments were provided
-if [ -z "$SAMPLE_MAP_FILE" ] || [ -z "$FQ_SOURCE_DIR" ] || [ -z "$TOP_LEVEL_OUTPUT_DIR" ] || [ -z "$REF_FA" ]; then
+if [ -z "$FQ_SOURCE_DIR" ] || [ -z "$TOP_LEVEL_OUTPUT_DIR" ] || [ -z "$REF_FA" ]; then
     echo "Error: Missing one or more required arguments."
     usage
 fi
 
 # Check if input files/directories exist
-if [ ! -f "$SAMPLE_MAP_FILE" ]; then
-    echo "Error: Sample map file not found at: $SAMPLE_MAP_FILE"
-    exit 1
-fi
 if [ ! -f "$REF_FA" ]; then
     echo "Error: Reference FASTA file not found at: $REF_FA"
     exit 1
@@ -71,7 +67,6 @@ fi
 
 # Echo the assigned arguments to the log for traceability
 echo "--- Script Arguments Received ---"
-echo "Sample Map File:          ${SAMPLE_MAP_FILE}"
 echo "FASTQ Source Directory:   ${FQ_SOURCE_DIR}"
 echo "Top-Level Output Dir:     ${TOP_LEVEL_OUTPUT_DIR}"
 echo "Reference FASTA:          ${REF_FA}"
@@ -84,24 +79,26 @@ if [ -z "$SLURM_ARRAY_TASK_ID" ]; then
     exit 1
 fi
 
-# Read the line from the sample map corresponding to the task ID
-TASK_INFO=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$SAMPLE_MAP_FILE")
-if [ -z "$TASK_INFO" ]; then
-    echo "Error: No data found in '$SAMPLE_MAP_FILE' for task ID $SLURM_ARRAY_TASK_ID."
+### START: MODIFIED SECTION ###
+# This block now finds the Nth .fq file instead of reading a map file.
+
+# Create a sorted array of all .fq files in the source directory.
+# 'mapfile' reads lines into an array. Sorting is crucial for predictable order.
+mapfile -t ALL_FILES < <(find "$FQ_SOURCE_DIR" -maxdepth 1 -name "*.fq" | sort)
+
+# Get the specific file for this SLURM task ID.
+# Arrays are 0-indexed, SLURM tasks are 1-indexed, so we subtract 1.
+RAW_FASTQ="${ALL_FILES[$((SLURM_ARRAY_TASK_ID - 1))]}"
+
+# Derive the sample ID from the filename by removing the path and the .fq extension.
+SAMPLE_ID=$(basename "$RAW_FASTQ" .fq)
+
+# Check that we successfully found a file.
+if [ -z "$RAW_FASTQ" ] || [ ! -f "$RAW_FASTQ" ]; then
+    echo "Error: Could not find a .fq file for task ID $SLURM_ARRAY_TASK_ID in '$FQ_SOURCE_DIR'."
     exit 1
 fi
-
-# Parse the sample name and barcode from the line
-IFS=':' read -r SAMPLE_ID BARCODE <<< "$TASK_INFO"
-SAMPLE_ID=$(echo "$SAMPLE_ID" | xargs)
-BARCODE=$(echo "$BARCODE" | xargs)
-
-# Find the specific input FASTQ file
-RAW_FASTQ=$(find "$FQ_SOURCE_DIR" -name "${SAMPLE_ID}.fastq.gz" | head -n 1)
-if [ -z "$RAW_FASTQ" ]; then
-    echo "Error: Could not find FASTQ file for sample '$SAMPLE_ID' in '$FQ_SOURCE_DIR'."
-    exit 1
-fi
+### END: MODIFIED SECTION ###
 
 # Define output directories based on parsed info
 PROJECT_DIR="${TOP_LEVEL_OUTPUT_DIR}/${SAMPLE_ID}"
