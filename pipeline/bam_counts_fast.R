@@ -120,22 +120,44 @@ process_region <- function(region_info, fasta_handle, bam_handle, all_bases) {
 
   # Correctly generate reference base and k-mer
 
-  # Get all unique positions that have read coverage.
-  covered_positions <- unique(counts_dt$pos)
-  pos_dt <- data.table(pos = covered_positions)
-
-  # Get reference sequence for each position's k-mer window from the FORWARD strand
-  kmer_gr <- GRanges(seqnames = region_info$chr,
-                     ranges = IRanges(start = pos_dt$pos - 2, end = pos_dt$pos + 2))
-  kmer_seqs <- getSeq(fasta_handle, kmer_gr)
+  # Start with a data.table of all positions that have read coverage
+  pos_dt <- data.table(pos = unique(counts_dt$pos))
   
-  # If gene is on minus strand, reverse-complement the sequences
+  # Get the reference base for ALL valid positions.
+  ref_base_gr <- GRanges(seqnames = region_info$chr, ranges = IRanges(start = pos_dt$pos, end = pos_dt$pos))
+  ref_base_seqs <- getSeq(fasta_handle, ref_base_gr)
+  
+  # Perform strand orientation for the single reference base
   if (region_info$strand == "-") {
-    kmer_seqs <- reverseComplement(kmer_seqs)
+    # For a single base, we just need the complement, not the full reverse-complement
+    ref_base_seqs <- complement(ref_base_seqs)
   }
+  pos_dt[, reference := as.character(ref_base_seqs)]
   
-  pos_dt[, kmer := as.character(kmer_seqs)]
-  pos_dt[, reference := substring(kmer, 3, 3)]
+  # Get the k-mer ONLY for interior positions where the window is valid.
+  pos_dt[, kmer := as.character(NA)] # Initialize k-mer column with NA
+  
+  chrom_lengths <- seqlengths(fasta_handle)
+  chrom_len <- chrom_lengths[region_info$chr]
+  
+  # Identify which positions are valid for 5-mer extraction
+  is_valid_kmer_pos <- (pos_dt$pos >= 3) & (pos_dt$pos <= (chrom_len - 2))
+  
+  # If there are any valid interior positions, calculate their k-mers
+  if (any(is_valid_kmer_pos)) {
+    valid_positions <- pos_dt$pos[is_valid_kmer_pos]
+    
+    kmer_gr <- GRanges(seqnames = region_info$chr,
+                       ranges = IRanges(start = valid_positions - 2, end = valid_positions + 2))
+    kmer_seqs <- getSeq(fasta_handle, kmer_gr)
+    
+    if (region_info$strand == "-") {
+      kmer_seqs <- reverseComplement(kmer_seqs)
+    }
+    
+    # Update only the valid rows in the pos_dt table
+    pos_dt[is_valid_kmer_pos, kmer := as.character(kmer_seqs)]
+  }
   
   # Merge counts with reference/k-mer info
   res_dt <- merge(counts_dt, pos_dt, by.x = "pos", by.y = "pos", all.x = TRUE)
