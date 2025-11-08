@@ -1,6 +1,6 @@
 # File Prep
 
-The point of file prep is to go from a compressed fastq file, named as a barcode from Nanopore demultiplexing, into a mapped bam file that is ready for downstream processing.
+The point of file prep is to go from a compressed fastq file, named as a barcode from Nanopore demultiplexing, into a mapped bam file that is ready for downstream processing. All scripts are intended to work on Sherlock, Stanford's HPC.
 
 ## submit_file_prep.sh
 
@@ -13,6 +13,26 @@ Its steps are:
 4. Launch Pipeline: Each job in the submitted array will execute the user-provided pipeline script. This submitter script passes the necessary file paths and settings on to that pipeline script, which then processes one sample per job.
 
 One current limitation of this script is that it can only submit one primary executeable script at a time. To link together other scripts, they must be called in a single bash file.
+
+Examples of how to use, referencing the scripts below:
+
+```bash
+bash $HOME/BIDamplicon/pipeline/submit_file_prep.sh \
+    -u rodell@stanford.edu -t 4:00:00 \
+    -s /home/users/rodell/BIDamplicon/pipeline/trim_map_dedup_mpra.sh \
+    -a /scratch/users/rodell/20251106_pool1/invitro/barcodes_may.txt \
+    -i /oak/stanford/groups/nicolemm/mmontes/053025_IVpsi_pool1_enzymeTestBS/RUN1/20250530_1516_P2S-01916-B_PBC44754_1d396595/fastq_pass \
+    -o /scratch/users/rodell/20251106_pool1/invitro/maydata \
+    -r /home/groups/nicolemm/rodell/pool1/pool1_cleaned_noadapters.fasta
+
+bash $HOME/BIDamplicon/pipeline/submit_file_prep.sh \
+    -u rodell@stanford.edu -t 4:00:00 \
+    -s /home/users/rodell/BIDamplicon/pipeline/trim_map_mpra.sh \
+    -a /scratch/users/rodell/20251106_pool1/incell/barcodes.txt \
+    -i /oak/stanford/groups/nicolemm/rodell/BIDamplicon/20241114_pool1/fastq \
+    -o /scratch/users/rodell/20251106_pool1/incell/prep \
+    -r /home/groups/nicolemm/rodell/pool1/pool1_cleaned_noadapters.fasta
+```
 
 
 ## trim_map_dedup.sh
@@ -61,3 +81,40 @@ KEY DIFFERNECES TO NOTE:
 - Input fastq files should already be named with the sample name.
 - Input fastq files are not gzipped.
 This truly is rather custom built for the mess I made of the Nov2024 Pool1 sequencing. Here's to learning and growing.
+
+# Counting
+
+Aggregates the nucleotide counts for all samples All scripts are intended to work on Sherlock, Stanford's HPC.
+
+## BIDdetect.sh
+
+This script automates the process of calculating and aggregating nucleotide counts from multiple bam files.
+
+Required Inputs:
+- -b, --bam_dir: A directory containing one or more sorted and indexed BAM files (.bam).
+- -o, --output_dir: A path to a directory where all results and logs will be stored.
+- -r, --ref_fasta: The path to the reference genome FASTA file.
+- -e, --bed_file: The path to a BED file defining the genomic regions of interest.
+
+Optional Input:
+- -n, --col_names: A string defining column names for the final formatting step (Default: 'celltype_vector_rep_treat').
+
+Key Outputs:
+
+- Final Data File (${DEST_DIR}/BIDdetect_data.txt): The main result of the pipeline, containing the fully processed and formatted count data after all steps. This should be taken into further analyses.
+- Aggregated Counts File (${DEST_DIR}/BIDdetect_counts.txt): A master table containing the raw, combined counts from all input BAM files before the final formatting step.
+- Log File (${DEST_DIR}/logs/BIDdetect_...log): A timestamped log file that captures all screen output for debugging and record-keeping.
+- Intermediate Files (${DEST_DIR}/intermediate_counts/): A directory holding the temporary count files generated for each individual sample before they are aggregated.
+
+Workflow:
+
+1. Argument Parsing & Validation: makes sure all required variables are present and valid
+2. Environment Setup: loads appropriate modules, sets up directories, creates logging system
+3. Main Processing Loop (Per-Sample Analysis): iterates through every (indexed) .bam file in the input directory
+    1. Extracts a clean sample name from the filename. 
+    2. Executes the bam_counts_fast.R script that performs a pileup on the BAM file at the positions defined in the BED file to generate nucleotide, deletion, and insertion counts. Calculates the deletion rate (deletions / total reads) for each site. 
+    3. Saves the per-sample results to a temporary file in the intermediate_counts directory. 
+    4. Appends the results from the temporary file to a single master file (BIDdetect_counts.txt), adding a new column containing the sample name.
+4. Variable Extraction from File Name: calls sample_name.R to split the file name into 4 different columns, as defined in the --col_names argument.
+5. Final Processing & Cleanup: saves final data to BIDdetect_data.txt, outputs locations of final files
+
