@@ -258,6 +258,7 @@ theme_heat <- function(base_size = 16) {
 }
 
 
+
 # ---- Data Loading and Validation ----
 cat("--- Loading and Validating Input Data ---\n")
 
@@ -451,9 +452,22 @@ if (args$plot_all_sites) {
       ) %>%
       arrange(desc(delta_delrate))
 
-    p_all <- ggplot(plot_data, aes(x = treat, y = delrate, fill = treat)) +
-      geom_boxplot(outlier.shape = NA) +
-      geom_jitter(aes(color = factor(rep)), width = 0.3, size = 2, alpha = 0.8) +
+    summary_for_bars <- plot_data %>%
+      group_by(facet_label, treat) %>%
+      summarise(
+        mean_delrate = mean(delrate, na.rm = TRUE),
+        sd_delrate = sd(delrate, na.rm = TRUE),
+        .groups = "drop"
+      )
+
+    p_all <- ggplot() +
+      geom_bar(data = summary_for_bars, 
+          aes(x = treat, y = mean_delrate, fill = treat), stat = "identity") +
+      geom_errorbar(data = summary_for_bars,
+        aes(x = treat, ymin = pmax(0, mean_delrate - sd_delrate), ymax = mean_delrate + sd_delrate),
+        width = 0.3, color = "black") +
+      geom_jitter(data = plot_data, 
+        aes(x = treat, y = delrate, color = factor(rep)), width = 0.2, size = 2) +
       facet_wrap(~ facet_label, ncol = 8) +
       labs(title = "Deletion Rates for Individual Sites", x = "Treatment", y = "Deletion Rate") +
       theme_boxplot(base_size = 10) +
