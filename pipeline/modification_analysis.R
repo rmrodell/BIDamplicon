@@ -66,7 +66,7 @@ if (getRversion() < "4.3.0") {
 # ---- Install and Load Libraries ----
 required_packages <- c(
   "argparse", "dplyr", "readr", "car", "tidyr", "purrr",
-  "ggplot2", "ggtext", "blme"
+  "ggplot2", "ggtext", "blme", "future", "furrr"
 )
 missing_packages <- required_packages[!sapply(required_packages, requireNamespace, quietly = TRUE)]
 
@@ -85,6 +85,8 @@ suppressPackageStartupMessages({
   library(ggplot2)
   library(ggtext)
   library(blme)
+  library(future)
+  library(furrr)
 })
 
 
@@ -101,6 +103,8 @@ parser$add_argument("-c", "--color", type="character", default="#c154c1",
                     help="Hex code for 'modified' sites in plots. Default: '#c154c1'")
 parser$add_argument("-s", "--sesoi", type="double", default=0.05,
                     help="Smallest Effect Size of Interest (SESOI) for equivalence testing. Default: 0.05")
+parser$add_argument("--cores", type="integer", default=-1, 
+                    help="Number of cores to use for parallel processing. Default: -1 for all available cores.")
 parser$add_argument("--plot_all_sites", action="store_true", default=FALSE,
                     help="If set, generate a large PDF plotting every individual site.")
 
@@ -322,11 +326,22 @@ data_for_testing <- data %>%
 cat(nrow(low_rate_site_keys), "sites were filtered out as 'Unmodified' (all rates <", RATE_THRESHOLD_LOW, ").\n")
 cat(n_distinct(data_for_testing$chr, data_for_testing$pos), "sites remain for statistical modeling.\n")
 
+num_cores <- if (args$cores == -1) availableCores() else args$cores
+if (num_cores > 1) {
+    cat("Setting up parallel backend with", num_cores, "cores...\n")
+    plan(multisession, workers = num_cores)
+} else {
+    cat("Running analysis sequentially on 1 core.\n")
+    plan(sequential)
+}
+
 # Run the unified statistical analysis function
 all_stats_results <- diff_equiv_analysis(
   data = data_for_testing,
   sesoi = args$sesoi
 )
+
+plan(sequential)
 
 # Join statistical results back to the master summary table
 final_output <- master_summary %>%
@@ -370,7 +385,7 @@ modified_summary_stats <- modified_sites %>%
     max_delta_delrate = max(delta_delrate, na.rm = TRUE)
   )
 cat("\n--- Summary of Delta Deletion Rate for Modified Sites ---\n")
-print(modified_summary_stats)
+print(modified_summary_stats, width = Inf)
 
 # Unmodified Sites
 unmodified_sites <- final_output %>% filter(category == "Unmodified")
@@ -393,7 +408,7 @@ if (nrow(modified_sites) >= 4) {
         min_delta_delrate = min(delta_delrate, na.rm = TRUE),
         max_delta_delrate = max(delta_delrate, na.rm = TRUE)
       )
-    print(quartile_summary_stats)
+    print(quartile_summary_stats, width = Inf)
 
     p_quartile_boxplot <- ggplot(modified_sites_quartiles, aes(x = factor(quartile), y = delta_delrate)) +
       geom_boxplot(fill = modified_color) +
