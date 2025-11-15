@@ -527,7 +527,7 @@ if (nrow(modified_sites) > 0) {
       mutate(condition = factor(gsub("avg_delrate_", "", condition), levels = c("input", "BS")))
 
     p_heatmap_base <- ggplot(mod_long_heat, aes(x = condition, y = site_id, fill = delrate)) +
-      geom_tile(color = "white") +
+      geom_tile() +
       scale_fill_gradient(low = "white", high = modified_color, name = "Avg. Del Rate", limits=c(0,1)) +
       theme_heat() +
       labs(
