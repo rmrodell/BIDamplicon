@@ -75,6 +75,25 @@ Its steps are:
 8. Finalize and Clean Up: It copies the final, deduplicated BAM file to a common output directory, verifies the copy's integrity with a checksum, indexes the file, and removes temporary intermediate files.
 9. Reporting: Throughout the process, it tracks read counts and file sizes at each major step, printing a final summary table to the log.
 
+## trim_bowite2_dedup_mpra.sh
+
+This script processes a single Nano-BID-Amp sample as part of a SLURM array job. This script is appropriate for MPRA where there are two sets of adapters, the Nanopore adapters and the MPRA adapters, to trim from the reads. Nanopore adapters are trimmed prior to UMI extraction, MPRA adapters are trimmed following UMI extraction.
+
+This script differs from the one above (trim_map_dedup_mpra.sh) through the use of bowtie2 as the aligner rather than minimap2. Preliminary insights indicate this is a better approach for highly degenerate sequences (i.e. mutagenesis pools) to prevent multi-mapping reads, which is a large problem with the minimap2 parameters in the above approach.
+
+Due to the different arguments, this script needs to be submitted with submit_file_prep_bowtie.sh, which works similarly to submit_file_prep.sh.
+
+Its steps are:
+1. Setup and Initialization: It parses command-line arguments, uses the SLURM array task ID to identify a specific sample from a map file, sets up output directories, and redirects all output to a log file.
+2. Filter Reads: It uses cutadapt with linked adapters to process the compressed FASTQ file twice, creating two separate files: one containing "sense" reads and another with "antisense" reads, based on the Nanopore adapter sequences.
+3. Unify Read Orientation: It reverse-complements the "antisense" reads and then concatenates them with the "sense" reads. This creates a single FASTQ file where all reads are oriented in the sense direction.
+4. Extract UMIs: It uses umi_tools extract to pull 10-nucleotide Unique Molecular Identifiers (UMIs) from the 3' end of each read, embedding the UMI into the read's header for later use.
+5. Second Trim: Performs a second cutadapt pass on the UMI-tagged reads to remove adapter sequences for the MPRA.
+6. Align Reads: It maps the UMI-tagged reads to a reference genome using bowtie2 with an end-to-end approach and converts the resulting SAM output into a sorted BAM file with samtools.
+7. Deduplicate Reads: It uses umi_tools dedup to identify and remove PCR duplicates from the sorted BAM file, using the UMI and alignment position of each read.
+8. Finalize and Clean Up: It copies the final, deduplicated BAM file to a common output directory, verifies the copy's integrity with a checksum, indexes the file, and removes temporary intermediate files.
+9. Reporting: Throughout the process, it tracks read counts and file sizes at each major step, printing a final summary table to the log.
+
 ## trim_map_mpra.sh
 
 This script processes a single Nano-BID-Amp sample as part of a SLURM array job. This script is appropriate for MPRA with the MPRA adapters, but where technical issues during library creation resulted in non-functional UMIs. Deduplication does not occur in this script.
