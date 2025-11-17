@@ -421,8 +421,8 @@ if (nrow(modified_sites) >= 4) {
       )
 
     plot_path <- file.path(plot_dir, paste0(args$prefix, "_boxplot_modified_quartiles"))
-    ggsave(paste0(plot_path, ".pdf"), p_quartile_boxplot, width = 4, height = 4)
-    ggsave(paste0(plot_path, ".png"), p_quartile_boxplot, width = 4, height = 4, dpi = 300)
+    ggsave(paste0(plot_path, ".pdf"), p_quartile_boxplot, width = 4, height = 4, units = "in")
+    ggsave(paste0(plot_path, ".png"), p_quartile_boxplot, width = 4, height = 4, units = "in")
 
     # Save data for each quartile
     modified_sites_quartiles %>%
@@ -505,8 +505,8 @@ if (nrow(modified_sites) > 0) {
       scale_fill_manual(values = c("input" = input_color, "BS" = modified_color))
 
     plot_path <- file.path(plot_dir, paste0(args$prefix, "_boxplot_modified_summary"))
-    ggsave(paste0(plot_path, ".pdf"), p_box, width = 4, height = 4)
-    ggsave(paste0(plot_path, ".png"), p_box, width = 4, height = 4, dpi=300)
+    ggsave(paste0(plot_path, ".pdf"), p_box, width = 4, height = 4, units = "in")
+    ggsave(paste0(plot_path, ".png"), p_box, width = 4, height = 4, units = "in")
     cat("Summary boxplot of modified sites saved.\n")
 }
 
@@ -541,8 +541,8 @@ if (nrow(modified_sites) > 0) {
       theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
 
     plot_path_nolabels <- file.path(plot_dir, paste0(args$prefix, "_heatmap_modified_summary_nolabels"))
-    ggsave(paste0(plot_path_nolabels, ".pdf"), p_heatmap_nolabels, width = 4, height = 6)
-    ggsave(paste0(plot_path_nolabels, ".png"), p_heatmap_nolabels, width = 4, height = 6, dpi=300)
+    ggsave(paste0(plot_path_nolabels, ".pdf"), p_heatmap_nolabels, width = 4, height = 6, units = "in")
+    ggsave(paste0(plot_path_nolabels, ".png"), p_heatmap_nolabels, width = 4, height = 6, units = "in")
     cat("Summary heatmap without labels saved.\n")
 
     p_heatmap_labels <- p_heatmap_base +
