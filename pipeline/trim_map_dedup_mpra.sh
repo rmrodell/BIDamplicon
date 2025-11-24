@@ -303,10 +303,10 @@ log_message "Step 6: Mapping reads with Minimap2..."
 start_time=$(date +%s)
 
 $OAK/rodell/minimap2/minimap2 \
-    -a \
+    -ax sr \
     "$REF_FA" \
     "$COMBINED_TRIM2" \
-    -k5 -t "$THREADS" \
+    -t "$THREADS" \
     > "$MAPPED_SAM"
 
 track_metrics "6_Mapped_SAM" "$MAPPED_SAM"
