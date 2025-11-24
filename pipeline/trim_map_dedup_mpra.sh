@@ -167,6 +167,7 @@ ANTISENSE_ADAPTER_3PRIME="CGCAATATCAGCACCAACAGAAA"
 POOL_SENSE_ADAPTER_5PRIME="GACGCTCTTCCGATCT"
 POOL_SENSE_ADAPTER_3PRIME="CACTCGGGCACCAAGGAC"
 UMI_PATTERN="NNNNNNNNNN"
+MAPQ_THRESHOLD=30
 
 # SLURM-aware thread count
 if [ -n "$SLURM_CPUS_PER_TASK" ]; then THREADS="$SLURM_CPUS_PER_TASK"; else THREADS=1; fi
@@ -224,6 +225,7 @@ COMBINED_TRIM2="${TMP_DIR}/${SAMPLE_ID}_all_sense_trim2.fastq"
 MAPPED_SAM="${TMP_DIR}/${SAMPLE_ID}_mapped.sam"
 MAPPED_BAM="${TMP_DIR}/${SAMPLE_ID}_mapped_sorted.bam"
 PRIMARY_ONLY_BAM="${TMP_DIR}/${SAMPLE_ID}_primary_only.bam"
+HIGH_QUAL_PRIMARY_BAM="${TMP_DIR}/${SAMPLE_ID}_high_qual_primary.bam"
 DEDUP_BAM="${FINAL_DIR}/${SAMPLE_ID}_deduplicated.bam"
 MINIMAP2_LOG="${LOGS_DIR}/${SAMPLE_ID}_minimap2_mapping.log"
 DEDUP_LOG="${LOGS_DIR}/${SAMPLE_ID}_umi_tools_dedup.log"
@@ -323,10 +325,14 @@ end_time=$(date +%s); log_message "Step 7 finished. Duration: $(format_duration 
 
 # --- 8. Filter for Primary Alignments ---
 # This step removes secondary (256) and supplementary (2048) alignments. 256 + 2048 = 2304.
-log_message "Step 8: Filtering for primary alignments only..."
+log_message "Step 8: Filtering for primary alignments only with MAPQ >= ${MAPQ_THRESHOLD}..."
 start_time=$(date +%s)
 samtools view -h -b -F 2304 -@ "$THREADS" -o "$PRIMARY_ONLY_BAM" "$MAPPED_BAM"
 track_metrics "8_Primary_Only_BAM" "$PRIMARY_ONLY_BAM"
+
+samtools view -h -b -q "${MAPQ_THRESHOLD}" -@ "$THREADS" -o "$HIGH_QUAL_PRIMARY_BAM" "$PRIMARY_ONLY_BAM"
+samtools index -@ "$THREADS" "$HIGH_QUAL_PRIMARY_BAM"
+track_metrics "8b_High_Qual_Primary_BAM" "$HIGH_QUAL_PRIMARY_BAM"
 end_time=$(date +%s); log_message "Step 8 finished. Duration: $(format_duration $((end_time - start_time)))"
 
 # --- 9. Deduplicate Reads with UMI-tools ---
@@ -334,7 +340,7 @@ log_message "Step 9: Deduplicating reads with UMI-tools and indexing..."
 start_time=$(date +%s)
 umi_tools dedup \
     --method directional \
-    -I "$PRIMARY_ONLY_BAM" \
+    -I "$HIGH_QUAL_PRIMARY_BAM" \
     -S "$DEDUP_BAM" \
     -L "$DEDUP_LOG"
 track_metrics "9_Deduplicated_BAM" "$DEDUP_BAM"
