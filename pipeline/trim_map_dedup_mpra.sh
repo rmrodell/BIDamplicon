@@ -223,6 +223,7 @@ COMBINED_UMI="${TMP_DIR}/${SAMPLE_ID}_all_sense_umi.fastq"
 COMBINED_TRIM2="${TMP_DIR}/${SAMPLE_ID}_all_sense_trim2.fastq"
 MAPPED_SAM="${TMP_DIR}/${SAMPLE_ID}_mapped.sam"
 MAPPED_BAM="${TMP_DIR}/${SAMPLE_ID}_mapped_sorted.bam"
+PRIMARY_ONLY_BAM="${TMP_DIR}/${SAMPLE_ID}_primary_only.bam"
 DEDUP_BAM="${FINAL_DIR}/${SAMPLE_ID}_deduplicated.bam"
 MINIMAP2_LOG="${LOGS_DIR}/${SAMPLE_ID}_minimap2_mapping.log"
 DEDUP_LOG="${LOGS_DIR}/${SAMPLE_ID}_umi_tools_dedup.log"
@@ -320,20 +321,27 @@ samtools index "$MAPPED_BAM"
 track_metrics "7_Sorted_BAM" "$MAPPED_BAM"
 end_time=$(date +%s); log_message "Step 7 finished. Duration: $(format_duration $((end_time - start_time)))"
 
-# --- 8. Deduplicate Reads with UMI-tools ---
-log_message "Step 8: Deduplicating reads with UMI-tools and indexing..."
+# --- 8. Filter for Primary Alignments ---
+# This step removes secondary (256) and supplementary (2048) alignments. 256 + 2048 = 2304.
+log_message "Step 8: Filtering for primary alignments only..."
+start_time=$(date +%s)
+samtools view -h -b -F 2304 -@ "$THREADS" -o "$PRIMARY_ONLY_BAM" "$MAPPED_BAM"
+track_metrics "8_Primary_Only_BAM" "$PRIMARY_ONLY_BAM"
+end_time=$(date +%s); log_message "Step 8 finished. Duration: $(format_duration $((end_time - start_time)))"
+
+# --- 9. Deduplicate Reads with UMI-tools ---
+log_message "Step 9: Deduplicating reads with UMI-tools and indexing..."
 start_time=$(date +%s)
 umi_tools dedup \
     --method directional \
-    -I "$MAPPED_BAM" \
+    -I "$PRIMARY_ONLY_BAM" \
     -S "$DEDUP_BAM" \
     -L "$DEDUP_LOG"
-track_metrics "8_Deduplicated_BAM" "$DEDUP_BAM"
-end_time=$(date +%s); log_message "Step 8 finished. Duration: $(format_duration $((end_time - start_time)))"
+track_metrics "9_Deduplicated_BAM" "$DEDUP_BAM"
+end_time=$(date +%s); log_message "Step 9 finished. Duration: $(format_duration $((end_time - start_time)))"
 
-
-# --- Step 9: Copy Final BAM to Common Output Directory ---
-log_message "Step 9: Copying and indexing final BAM..."
+# --- Step 10: Copy Final BAM to Common Output Directory ---
+log_message "Step 10: Copying and indexing final BAM..."
 start_time=$(date +%s)
 
 DEST_BAM_PATH="${FINAL_COMMON_DIR}/${SAMPLE_ID}.bam"
@@ -361,12 +369,12 @@ fi
 # 4. Index the bam file
 samtools index "$DEST_BAM_PATH"
 
-# --- Step 10: Clean up intermediate files ---
-# log_message "Step 10: Remove intermediary files."
+# --- Clean up intermediate files ---
+# log_message "Remove intermediary files."
 # rm -rf "$TMP_DIR"
 
 log_message "--- Pipeline for ${SAMPLE_ID} finished successfully! ---"
 
-# --- Step 10: Display Final Metrics Report ---
-log_message "Step 10: Displaying run metrics summary for ${SAMPLE_ID}:"
+# --- Step 11: Display Final Metrics Report ---
+log_message "Step 11: Displaying run metrics summary for ${SAMPLE_ID}:"
 column -t -s $'\t' "$METRICS_FILE"
