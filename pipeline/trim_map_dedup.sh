@@ -153,6 +153,7 @@ FINAL_COMMON_DIR="${TOP_LEVEL_OUTPUT_DIR}/deduplicated_bam"
 # Load modules
 ml biology py-cutadapt/1.18_py36 samtools
 ml python/3.6.1
+ml devel java/11
 
 # Stop the script if any command fails
 set -e
@@ -310,11 +311,14 @@ end_time=$(date +%s); log_message "Step 6 finished. Duration: $(format_duration 
 # --- 7. Deduplicate Reads with UMI-tools ---
 log_message "Step 7: Deduplicating reads with UMI-tools and indexing..."
 start_time=$(date +%s)
-umi_tools dedup \
-    --method directional \
-    -I "$MAPPED_BAM" \
-    -S "$DEDUP_BAM" \
-    -L "$DEDUP_LOG"
+$HOME/UMICollapse/umicollapse bam \
+    -i "$MAPPED_BAM" \
+    -o "$DEDUP_BAM"
+# umi_tools dedup \
+#     --method directional \
+#     -I "$MAPPED_BAM" \
+#     -S "$DEDUP_BAM" \
+#     -L "$DEDUP_LOG"
 track_metrics "7_Deduplicated_BAM" "$DEDUP_BAM"
 end_time=$(date +%s); log_message "Step 7 finished. Duration: $(format_duration $((end_time - start_time)))"
 
