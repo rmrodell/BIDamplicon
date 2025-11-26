@@ -128,11 +128,17 @@ for bam_file in "$BAM_DIR"/*.bam; do
         --referenceFasta "$REF_FA" \
         --outputFile "$intermediate_result_file"
 
-    echo "Appending results to master count file..."
-    # Append the results to the master file, skipping the header line
-    awk -v sample="$sample" 'NR > 1 {print sample "\t" $0}' "$intermediate_result_file" >> "$master_count_file"
-
-    echo "Finished processing sample: ${sample}"
+    # Check if the intermediate file was created and has content before appending
+    if [ -s "$intermediate_result_file" ]; then
+        echo "Appending results to master count file..."
+        # Append the results, skipping the header, and add the sample name
+        awk -v sample="$sample" 'NR > 1 {print sample "\t" $0}' "$intermediate_result_file" >> "$master_count_file"
+        echo "Finished processing sample: ${sample}"
+    else
+        # If the file is empty or missing, log a warning and continue
+        echo "WARNING: No counts generated for sample ${sample}. Skipping append step."
+    fi
+    
 done
 
 echo "-------------------------------------------------"
