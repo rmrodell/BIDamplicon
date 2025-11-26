@@ -55,8 +55,7 @@ Its steps are:
 2. Filter Reads: It uses cutadapt with linked adapters to process the compressed FASTQ file twice, creating two separate files: one containing "sense" reads and another with "antisense" reads, based on the Nanopore adapter sequences.
 3. Unify Read Orientation: It reverse-complements the "antisense" reads and then concatenates them with the "sense" reads. This creates a single FASTQ file where all reads are oriented in the sense direction.
 4. Extract UMIs: It uses umi_tools extract to pull 10-nucleotide Unique Molecular Identifiers (UMIs) from the 3' end of each read, embedding the UMI into the read's header for later use.
-5. Align Reads: It maps the UMI-tagged reads to a reference genome using minimap2 and converts the resulting SAM output into a sorted BAM file with samtools.
-    - TO DO: Update minimap2 command.
+5. Align Reads: It maps the UMI-tagged reads to a reference genome using minimap2 with default settings for short genomice read and converts the resulting SAM output into a sorted BAM file with samtools.
 6. Deduplicate Reads: It uses UMICollapse dedup to identify and remove PCR duplicates from the sorted BAM file, using the UMI and alignment position of each read.
 7. Finalize and Clean Up: It copies the final, deduplicated BAM file to a common output directory, verifies the copy's integrity with a checksum, indexes the file, and removes temporary intermediate files.
 8. Reporting: Throughout the process, it tracks read counts and file sizes at each major step, printing a final summary table to the log. For BAM files, it reports the number of alignments. For fastq files, it reports the number of reads.

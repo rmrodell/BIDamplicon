@@ -291,11 +291,18 @@ log_message "Step 5: Mapping reads with Minimap2..."
 start_time=$(date +%s)
 
 $OAK/rodell/minimap2/minimap2 \
-    -a \
+    -ax sr \
     "$REF_FA" \
     "$COMBINED_UMI" \
-    -k5 -t "$THREADS" \
+    -t "$THREADS" \
     > "$MAPPED_SAM"
+
+# $OAK/rodell/minimap2/minimap2 \
+#     -a \
+#     "$REF_FA" \
+#     "$COMBINED_UMI" \
+#     -k5 -t "$THREADS" \
+#     > "$MAPPED_SAM"
 
 track_metrics "5_Mapped_SAM" "$MAPPED_SAM"
 end_time=$(date +%s); log_message "Step 5 finished. Duration: $(format_duration $((end_time - start_time)))"
