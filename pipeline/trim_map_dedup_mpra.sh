@@ -8,20 +8,21 @@
 
 # Function to display usage information
 usage() {
-    echo "Usage: $0 -m <sample_map_file> -i <input_dir> -o <top_level_output_dir> -r <ref_fasta>"
+    echo "Usage: $0 -m <sample_map_file> -i <input_dir> -o <top_level_output_dir> -r <ref_fasta> [-t <task_id>]"
     echo ""
     echo "Options:"
     echo "  -m, --map_file <file>        Path to the file mapping sample IDs to barcodes."
     echo "  -i, --input_dir <dir>        Directory containing the input fastq.gz files."
     echo "  -o, --output_dir <dir>       The root directory where all output will be stored."
     echo "  -r, --ref_fasta <file>       Reference FASTA file used for mapping."
+    echo "  -t, --task_id <integer>      SLURM_ARRAY_TASK_ID to simulate when not run as a SLURM job."
     echo "  -h, --help                   Display this help message."
     exit 1
 }
 
 # Define short and long options
-SHORT_OPTS="m:i:o:r:h"
-LONG_OPTS="map_file:,input_dir:,output_dir:,ref_fasta:,help"
+SHORT_OPTS="m:i:o:r:t:h"
+LONG_OPTS="map_file:,input_dir:,output_dir:,ref_fasta:,task_id:,help"
 
 # Parse the options using getopt
 PARSED_OPTS=$(getopt -o "$SHORT_OPTS" --long "$LONG_OPTS" -n "$0" -- "$@")
@@ -35,6 +36,9 @@ fi
 # Replace the script's positional parameters with the parsed options
 eval set -- "$PARSED_OPTS"
 
+# Initialize TASK_ID variable
+TASK_ID=""
+
 # Loop through the parsed options to assign variables
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -42,6 +46,7 @@ while [[ $# -gt 0 ]]; do
         -i|--input_dir)   FQ_SOURCE_DIR="$2"; shift 2 ;;
         -o|--output_dir)  TOP_LEVEL_OUTPUT_DIR="$2"; shift 2 ;;
         -r|--ref_fasta)   REF_FA="$2"; shift 2 ;;
+        -t|--task_id)     TASK_ID="$2"; shift 2 ;;  # Store the task ID
         -h|--help)        usage ;; # Assumes 'usage' function will exit the script
         --)               shift; break ;;
         *)                echo "Unknown option: $1" >&2; exit 1 ;;
@@ -75,13 +80,29 @@ echo "Sample Map File:          ${SAMPLE_MAP_FILE}"
 echo "FASTQ Source Directory:   ${FQ_SOURCE_DIR}"
 echo "Top-Level Output Dir:     ${TOP_LEVEL_OUTPUT_DIR}"
 echo "Reference FASTA:          ${REF_FA}"
+if [ -n "$TASK_ID" ]; then
+  echo "Command Line Task ID:   ${TASK_ID}"
+fi
 echo "---------------------------------"
 echo "" # Add a blank line for readability
 
 # --- 1. SLURM Array Task Setup ---
-if [ -z "$SLURM_ARRAY_TASK_ID" ]; then
-    echo "Error: This script must be run as a SLURM array job."
-    exit 1
+# Check if SLURM_ARRAY_TASK_ID is defined and a positive integer.
+if [[ -z "$SLURM_ARRAY_TASK_ID" ]]; then
+    if [[ -n "$TASK_ID" ]]; then
+        # Check if the provided task ID is a positive integer
+        if ! [[ "$TASK_ID" =~ ^[0-9]+$ ]]; then
+            echo "Error: Provided TASK_ID '$TASK_ID' is not a positive integer."
+            exit 1
+        fi
+        SLURM_ARRAY_TASK_ID="$TASK_ID"  # Assign the provided task ID
+        echo "Info: Running from command line, simulating SLURM_ARRAY_TASK_ID=$SLURM_ARRAY_TASK_ID"
+    else
+        echo "Error: This script requires either SLURM_ARRAY_TASK_ID (when run as a SLURM array job) or -t/--task_id (when run from the command line)."
+        exit 1
+    fi
+else
+  echo "Info: Running as SLURM job, using SLURM_ARRAY_TASK_ID=$SLURM_ARRAY_TASK_ID"
 fi
 
 # Read the line from the sample map corresponding to the task ID
