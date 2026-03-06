@@ -401,8 +401,8 @@ fi
 samtools index "$DEST_BAM_PATH"
 
 # --- Clean up intermediate files ---
-# log_message "Remove intermediary files."
-# rm -rf "$TMP_DIR"
+log_message "Remove intermediary files."
+rm -rf "$TMP_DIR"
 
 log_message "--- Pipeline for ${SAMPLE_ID} finished successfully! ---"
 
