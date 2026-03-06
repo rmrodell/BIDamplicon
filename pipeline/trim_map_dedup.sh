@@ -167,6 +167,7 @@ SENSE_ADAPTER_3PRIME="GAAGATAGAGCGACAGGCAAGT"
 ANTISENSE_ADAPTER_5PRIME="ACTTGCCTGTCGCTCTATCTTC"
 ANTISENSE_ADAPTER_3PRIME="CGCAATATCAGCACCAACAGAAA"
 UMI_PATTERN="NNNNNNNNNN"
+MAPQ_THRESHOLD=30
 
 # SLURM-aware thread count
 if [ -n "$SLURM_CPUS_PER_TASK" ]; then THREADS="$SLURM_CPUS_PER_TASK"; else THREADS=1; fi
@@ -222,6 +223,8 @@ COMBINED_TRIM1="${TMP_DIR}/${SAMPLE_ID}_all_sense_trim1.fastq"
 COMBINED_UMI="${TMP_DIR}/${SAMPLE_ID}_all_sense_umi.fastq"
 MAPPED_SAM="${TMP_DIR}/${SAMPLE_ID}_mapped.sam"
 MAPPED_BAM="${TMP_DIR}/${SAMPLE_ID}_mapped_sorted.bam"
+PRIMARY_ONLY_BAM="${TMP_DIR}/${SAMPLE_ID}_primary_only.bam"
+HIGH_QUAL_PRIMARY_BAM="${TMP_DIR}/${SAMPLE_ID}_high_qual_primary.bam"
 DEDUP_BAM="${FINAL_DIR}/${SAMPLE_ID}_deduplicated.bam"
 MINIMAP2_LOG="${LOGS_DIR}/${SAMPLE_ID}_minimap2_mapping.log"
 DEDUP_LOG="${LOGS_DIR}/${SAMPLE_ID}_umi_tools_dedup.log"
@@ -291,7 +294,7 @@ log_message "Step 5: Mapping reads with Minimap2..."
 start_time=$(date +%s)
 
 $OAK/rodell/minimap2/minimap2 \
-    -ax sr \
+    -ax splice -uf \
     "$REF_FA" \
     "$COMBINED_UMI" \
     -t "$THREADS" \
@@ -315,23 +318,35 @@ samtools index "$MAPPED_BAM"
 track_metrics "6_Sorted_BAM" "$MAPPED_BAM"
 end_time=$(date +%s); log_message "Step 6 finished. Duration: $(format_duration $((end_time - start_time)))"
 
-# --- 7. Deduplicate Reads with UMI-tools ---
-log_message "Step 7: Deduplicating reads with UMI-tools and indexing..."
+# --- 7. Filter for Primary Alignments ---
+# This step removes secondary (256) and supplementary (2048) alignments. 256 + 2048 = 2304.
+log_message "Step 8: Filtering for primary alignments only with MAPQ >= ${MAPQ_THRESHOLD}..."
+start_time=$(date +%s)
+samtools view -h -b -F 2304 -@ "$THREADS" -o "$PRIMARY_ONLY_BAM" "$MAPPED_BAM"
+track_metrics "8_Primary_Only_BAM" "$PRIMARY_ONLY_BAM"
+
+samtools view -h -b -q "${MAPQ_THRESHOLD}" -@ "$THREADS" -o "$HIGH_QUAL_PRIMARY_BAM" "$PRIMARY_ONLY_BAM"
+samtools index -@ "$THREADS" "$HIGH_QUAL_PRIMARY_BAM"
+track_metrics "8b_High_Qual_Primary_BAM" "$HIGH_QUAL_PRIMARY_BAM"
+end_time=$(date +%s); log_message "Step 8 finished. Duration: $(format_duration $((end_time - start_time)))"
+
+# --- 8. Deduplicate Reads with UMI-tools ---
+log_message "Step 8: Deduplicating reads with UMI-tools and indexing..."
 start_time=$(date +%s)
 $HOME/UMICollapse/umicollapse bam \
-    -i "$MAPPED_BAM" \
+    -i "$HIGH_QUAL_PRIMARY_BAM" \
     -o "$DEDUP_BAM"
 # umi_tools dedup \
 #     --method directional \
 #     -I "$MAPPED_BAM" \
 #     -S "$DEDUP_BAM" \
 #     -L "$DEDUP_LOG"
-track_metrics "7_Deduplicated_BAM" "$DEDUP_BAM"
-end_time=$(date +%s); log_message "Step 7 finished. Duration: $(format_duration $((end_time - start_time)))"
+track_metrics "8_Deduplicated_BAM" "$DEDUP_BAM"
+end_time=$(date +%s); log_message "Step 8 finished. Duration: $(format_duration $((end_time - start_time)))"
 
 
-# --- Step 8: Copy Final BAM to Common Output Directory ---
-log_message "Step 8: Copying and indexing final BAM..."
+# --- Step 9: Copy Final BAM to Common Output Directory ---
+log_message "Step 9: Copying and indexing final BAM..."
 start_time=$(date +%s)
 
 DEST_BAM_PATH="${FINAL_COMMON_DIR}/${SAMPLE_ID}.bam"
@@ -359,12 +374,12 @@ fi
 # 4. Index the bam file
 samtools index "$DEST_BAM_PATH"
 
-# --- Step 9: Clean up intermediate files ---
-log_message "Step 9: Intermediate file cleanup is currently disabled."
+# --- Step 10: Clean up intermediate files ---
+log_message "Step 10: Intermediate file cleanup is currently disabled."
 # rm -rf "$TMP_DIR"
 
 log_message "--- Pipeline for ${SAMPLE_ID} finished successfully! ---"
 
-# --- Step 10: Display Final Metrics Report ---
-log_message "Step 10: Displaying run metrics summary for ${SAMPLE_ID}:"
+# --- Step 11: Display Final Metrics Report ---
+log_message "Step 11: Displaying run metrics summary for ${SAMPLE_ID}:"
 column -t -s $'\t' "$METRICS_FILE"
