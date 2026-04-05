@@ -12,16 +12,27 @@
 #                 furrr, forcats
 #
 # Usage:
-#   1. Set all parameters in the "USER CONFIGURATION" section.
-#   2. Run the entire script in RStudio / other IDE.
+#   Rscript plot.R <path_to_input_file>
 #
 # ------------------------------------------------------------------------------
 
 # ---- USER CONFIGURATION ----
 
-# --- Global Settings ---
-input_file      <- "/scratch/users/rodell/20260305_endoBID/counts_delpos/BIDdetect_data.txt"
-output_dir      <- "/scratch/users/rodell/20260305_endoBID/counts_delpos"
+# --- Command Line Arguments & Directory Setup ---
+args <- commandArgs(trailingOnly = TRUE)
+
+if (length(args) == 0) {
+  stop("ERROR: No input file provided.\nUsage: Rscript plot.R <path_to_input_file>", call. = FALSE)
+}
+
+input_file <- args[1]
+
+if (!file.exists(input_file)) {
+  stop(paste("ERROR: Input file not found at", input_file), call. = FALSE)
+}
+
+# Automatically set output directory to the folder containing the input file
+output_dir <- dirname(input_file)
 
 # --- Analysis-Specific Parameters & Palettes ---
 
@@ -30,8 +41,9 @@ analysis_conditions <- c("Both")
 
 pus7_config <- list(
   factor_col = "PUS7level",
+  # factor_col = "vector",
   comparisons = list(
-    WT_v_KO = c("WT", "PUS7KO"),
+    WT_v_KO = c("WT", "PUS7KO")
     # WT_v_KD = c("P102", "P101"),
     # WT_v_KD = c("P36", "P97"),
     # WT_v_KD = c("pLKO", "shPUS7"),
@@ -117,7 +129,7 @@ generate_allsites_plot <- function(plot_data, num_facets, plot_title, filename, 
     coord_cartesian(ylim = c(0, NA))
   
   plot_height <- max(3, ceiling(n_distinct(plot_data$facet_label) / 8) * 3)
-  plot_width <- (num_facets * 1.5)
+  plot_width <- (num_facets * 1.75)
   ggsave(filename, p, width = plot_width, height = plot_height, units = "in", limitsize = FALSE)
   cat("      ... plot saved.\n")
 }
